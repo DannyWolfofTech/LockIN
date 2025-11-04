@@ -132,7 +132,7 @@ class SessionSetupScreen(QWidget):
 
         self.start_btn = ModernButton("Start Session", primary=True)
         self.start_btn.clicked.connect(self._start_session)
-        button_layout.addWidget(start_btn)
+        button_layout.addWidget(self.start_btn)
 
         layout.addLayout(button_layout)
 
