@@ -6,9 +6,21 @@ Handles process detection, blocking, and management
 import psutil
 import time
 import sys
+import os
 from typing import List, Set, Callable, Optional, Dict
 from pathlib import Path
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QFileIconProvider, QStyle, QApplication
+
+# Optional imports for Windows icon extraction
+try:
+    import win32api
+    import win32con
+    import win32gui
+    WINDOWS_ICONS_AVAILABLE = True
+except ImportError:
+    WINDOWS_ICONS_AVAILABLE = False
 
 
 class AppBlocker(QObject):
@@ -32,6 +44,8 @@ class AppBlocker(QObject):
         'system', 'smss.exe', 'csrss.exe', 'wininit.exe', 'services.exe',
         'lsass.exe', 'winlogon.exe', 'svchost.exe', 'explorer.exe',
         'dwm.exe', 'taskmgr.exe', 'conhost.exe', 'fontdrvhost.exe',
+        'wmi provider host', 'wmiprvse.exe', 'sihost.exe', 'taskhostw.exe',
+        'registry', 'memory compression', 'system idle process',
 
         # Linux System Processes
         'systemd', 'init', 'kthreadd', 'bash', 'sh', 'zsh', 'fish',
@@ -45,16 +59,50 @@ class AppBlocker(QObject):
         'python', 'python.exe', 'python3', 'python3.exe', 'pythonw.exe',
     }
 
-    # Additional processes to always whitelist
+    # Additional processes to always whitelist - system services and background tasks
     SYSTEM_WHITELIST = {
         # Security and System Tools
         'antimalware service executable', 'windows defender',
-        'securityhealthservice.exe', 'msmpeng.exe',
+        'securityhealthservice.exe', 'msmpeng.exe', 'msedge_pwahelper.exe',
+        'windows security notification icon', 'sgrmbroker.exe',
 
         # Essential Windows Services
         'runtimebroker.exe', 'searchindexer.exe', 'spoolsv.exe',
-        'audiodg.exe', 'consent.exe', 'ctfmon.exe',
+        'audiodg.exe', 'consent.exe', 'ctfmon.exe', 'dllhost.exe',
+        'backgroundtaskhost.exe', 'applicationframehost.exe',
+
+        # Windows System Apps (hide from user)
+        'textinputhost.exe', 'shellexperiencehost.exe', 'searchapp.exe',
+        'searchhost.exe', 'startmenuexperiencehost.exe', 'runtimebroker.exe',
+        'lockapp.exe', 'windows.warp.jitservice.exe', 'usocoreworker.exe',
+        'mobsync.exe', 'unsecapp.exe', 'wermgr.exe', 'winrshost.exe',
+
+        # Windows Update and Maintenance
+        'windows update', 'usoclient.exe', 'tiworker.exe', 'trustedinstaller.exe',
+        'musnotification.exe', 'musnotifyicon.exe',
+
+        # Drivers and Hardware
+        'nvdisplay.container.exe', 'nvcontainer.exe', 'amdrsserv.exe',
+        'radiergw.exe', 'igfxem.exe', 'igfxtray.exe', 'hkcmd.exe',
+        'atkexcomsvc.exe', 'asustptloader.exe',
+
+        # Background System Tasks
+        'useroobebroker.exe', 'searchprotocolhost.exe', 'searchfilterhost.exe',
+        'compattelrunner.exe', 'oobe.exe', 'cloudexperiencehostbroker.exe',
     }
+
+    # System paths to exclude (processes in these folders are usually system processes)
+    SYSTEM_PATHS = [
+        'c:\\windows\\system32',
+        'c:\\windows\\syswow64',
+        'c:\\windows\\systemapps',
+        'c:\\windows\\immersivecontrolpanel',
+        '/usr/bin',
+        '/usr/sbin',
+        '/usr/lib',
+        '/lib',
+        '/System/Library',
+    ]
 
     def __init__(self, parent=None):
         """Initialize the app blocker"""
@@ -275,12 +323,117 @@ class AppBlocker(QObject):
             self.known_processes.pop(pid, None)
             self.whitelisted_processes.discard(pid)
 
-    def get_running_apps(self) -> List[Dict[str, str]]:
+    def _is_system_process(self, name: str, exe_path: str) -> bool:
         """
-        Get list of all currently running applications
+        Check if a process is a system process that should be hidden from the user
+
+        Args:
+            name: Process name
+            exe_path: Full executable path
 
         Returns:
-            List of dicts with 'name' and 'path' keys
+            True if it's a system process
+        """
+        if not name:
+            return True
+
+        name_lower = name.lower()
+
+        # Check if it's in critical or system whitelist
+        if name_lower in {p.lower() for p in self.CRITICAL_PROCESSES}:
+            return True
+
+        if name_lower in {p.lower() for p in self.SYSTEM_WHITELIST}:
+            return True
+
+        # Check if exe path is in system paths
+        if exe_path:
+            exe_path_lower = exe_path.lower()
+            for sys_path in self.SYSTEM_PATHS:
+                if exe_path_lower.startswith(sys_path.lower()):
+                    return True
+
+        # Filter out common background processes and services
+        system_keywords = [
+            'service', 'host', 'broker', 'helper', 'installer', 'update',
+            'driver', 'daemon', 'agent', 'notif', 'manager', 'loader'
+        ]
+        for keyword in system_keywords:
+            if keyword in name_lower and not exe_path:
+                return True
+
+        return False
+
+    def _get_friendly_app_name(self, process_name: str, exe_path: str) -> str:
+        """
+        Get a friendly display name for an application
+
+        Args:
+            process_name: Process name (e.g., "chrome.exe")
+            exe_path: Full path to executable
+
+        Returns:
+            Friendly name (e.g., "Chrome")
+        """
+        # Remove .exe extension
+        name = process_name
+        if name.lower().endswith('.exe'):
+            name = name[:-4]
+
+        # Try to extract from path if available
+        if exe_path:
+            path_obj = Path(exe_path)
+            parent_name = path_obj.parent.name
+
+            # Use parent folder name for better clarity
+            # e.g., "Google\\Chrome\\Application\\chrome.exe" -> use "Chrome"
+            if parent_name.lower() not in ['bin', 'application', 'app', 'program files', 'program files (x86)']:
+                name = parent_name
+
+        # Capitalize properly
+        # Handle camelCase (e.g., "msedge" -> "MS Edge")
+        if name.islower() or name.isupper():
+            name = name.title()
+
+        return name
+
+    def _get_app_icon(self, exe_path: str) -> Optional[QIcon]:
+        """
+        Try to extract icon from executable
+
+        Args:
+            exe_path: Path to executable
+
+        Returns:
+            QIcon if found, None otherwise
+        """
+        if not exe_path or not os.path.exists(exe_path):
+            return None
+
+        try:
+            # Use Qt's file icon provider (works cross-platform)
+            icon_provider = QFileIconProvider()
+            icon = icon_provider.icon(QFileIconProvider.IconType.File)
+
+            # Try to get specific file icon
+            from PyQt6.QtCore import QFileInfo
+            file_info = QFileInfo(exe_path)
+            file_icon = icon_provider.icon(file_info)
+
+            if not file_icon.isNull():
+                return file_icon
+
+            return icon if not icon.isNull() else None
+
+        except Exception:
+            return None
+
+    def get_running_apps(self) -> List[Dict[str, str]]:
+        """
+        Get list of all currently running USER applications (filters out system processes)
+
+        Returns:
+            List of dicts with 'name', 'display_name', 'path', and 'icon' keys
         """
         apps = []
         seen = set()
@@ -294,10 +447,23 @@ class AppBlocker(QObject):
                     if not name or name.lower() in seen:
                         continue
 
+                    # Skip system processes
+                    if self._is_system_process(name, exe_path):
+                        continue
+
                     seen.add(name.lower())
+
+                    # Get friendly display name
+                    display_name = self._get_friendly_app_name(name, exe_path)
+
+                    # Try to get icon
+                    icon = self._get_app_icon(exe_path)
+
                     apps.append({
-                        'name': name,
-                        'path': exe_path
+                        'name': name,  # Original process name
+                        'display_name': display_name,  # Friendly name to show user
+                        'path': exe_path,
+                        'icon': icon
                     })
 
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -306,7 +472,7 @@ class AppBlocker(QObject):
         except Exception as e:
             self.error_occurred.emit(f"Error getting running apps: {str(e)}")
 
-        return sorted(apps, key=lambda x: x['name'].lower())
+        return sorted(apps, key=lambda x: x['display_name'].lower())
 
     def close_all_non_whitelisted_apps(self) -> int:
         """

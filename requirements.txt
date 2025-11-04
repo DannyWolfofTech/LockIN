@@ -14,3 +14,6 @@ python-dateutil>=2.8.2
 
 # For charts/graphs in stats dashboard (optional, can be added later)
 matplotlib>=3.8.0
+
+# Windows-specific (optional, for better icon extraction on Windows)
+pywin32>=306; platform_system == "Windows"

@@ -8,13 +8,32 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QSpinBox, QLineEdit,
     QProgressBar, QFrame, QScrollArea
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QPalette, QColor
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize
+from PyQt6.QtGui import QFont, QPalette, QColor, QIcon, QPixmap
 from typing import List, Dict
+import sys
+
+# Modern Color Scheme - Clean and Professional
+COLORS = {
+    'bg_primary': '#1a1a1a',      # Dark charcoal background
+    'bg_secondary': '#2a2a2a',    # Slightly lighter charcoal
+    'bg_tertiary': '#3a3a3a',     # Card/widget background
+    'accent_primary': '#10b981',  # Clean emerald green
+    'accent_hover': '#059669',    # Darker green on hover
+    'accent_pressed': '#047857',  # Even darker green when pressed
+    'danger': '#ef4444',          # Red for danger/exit
+    'danger_hover': '#dc2626',
+    'danger_pressed': '#b91c1c',
+    'text_primary': '#ffffff',    # White text
+    'text_secondary': '#a1a1aa',  # Gray text
+    'text_muted': '#71717a',      # Muted gray
+    'border': '#404040',          # Border color
+    'border_focus': '#10b981',    # Focused border (green)
+}
 
 
 class ModernButton(QPushButton):
-    """Modern styled button"""
+    """Modern styled button with clean flat design"""
 
     def __init__(self, text: str, primary: bool = False, danger: bool = False):
         super().__init__(text)
@@ -25,60 +44,63 @@ class ModernButton(QPushButton):
     def _setup_style(self):
         """Setup button styling"""
         if self.primary:
-            self.setStyleSheet("""
-                QPushButton {
-                    background-color: #3b82f6;
-                    color: white;
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLORS['accent_primary']};
+                    color: {COLORS['text_primary']};
                     border: none;
-                    border-radius: 8px;
+                    border-radius: 6px;
                     padding: 12px 24px;
                     font-size: 14px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #2563eb;
-                }
-                QPushButton:pressed {
-                    background-color: #1d4ed8;
-                }
-                QPushButton:disabled {
-                    background-color: #64748b;
-                }
+                    font-weight: 600;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLORS['accent_hover']};
+                }}
+                QPushButton:pressed {{
+                    background-color: {COLORS['accent_pressed']};
+                }}
+                QPushButton:disabled {{
+                    background-color: {COLORS['bg_tertiary']};
+                    color: {COLORS['text_muted']};
+                }}
             """)
         elif self.danger:
-            self.setStyleSheet("""
-                QPushButton {
-                    background-color: #ef4444;
-                    color: white;
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLORS['danger']};
+                    color: {COLORS['text_primary']};
                     border: none;
-                    border-radius: 8px;
+                    border-radius: 6px;
                     padding: 12px 24px;
                     font-size: 14px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #dc2626;
-                }
-                QPushButton:pressed {
-                    background-color: #b91c1c;
-                }
+                    font-weight: 600;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLORS['danger_hover']};
+                }}
+                QPushButton:pressed {{
+                    background-color: {COLORS['danger_pressed']};
+                }}
             """)
         else:
-            self.setStyleSheet("""
-                QPushButton {
-                    background-color: #334155;
-                    color: white;
-                    border: 1px solid #475569;
-                    border-radius: 8px;
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLORS['bg_tertiary']};
+                    color: {COLORS['text_primary']};
+                    border: 1px solid {COLORS['border']};
+                    border-radius: 6px;
                     padding: 10px 20px;
                     font-size: 14px;
-                }
-                QPushButton:hover {
-                    background-color: #475569;
-                }
-                QPushButton:pressed {
-                    background-color: #1e293b;
-                }
+                    font-weight: 500;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLORS['bg_secondary']};
+                    border-color: {COLORS['border_focus']};
+                }}
+                QPushButton:pressed {{
+                    background-color: {COLORS['bg_primary']};
+                }}
             """)
 
 
@@ -94,11 +116,12 @@ class TimerDisplay(QLabel):
         font = QFont("Segoe UI", 72, QFont.Weight.Bold)
         self.setFont(font)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setStyleSheet("""
-            QLabel {
-                color: #3b82f6;
+        self.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['accent_primary']};
                 padding: 20px;
-            }
+                background: transparent;
+            }}
         """)
 
     def set_time(self, hours: int, minutes: int, seconds: int):
@@ -123,37 +146,40 @@ class AppListWidget(QWidget):
 
         # Title
         title = QLabel("Whitelisted Apps")
-        title.setStyleSheet("""
-            QLabel {
-                color: #e2e8f0;
+        title.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_primary']};
                 font-size: 14px;
-                font-weight: bold;
+                font-weight: 600;
                 padding: 8px;
-            }
+                background: transparent;
+            }}
         """)
         layout.addWidget(title)
 
         # List widget
         self.list_widget = QListWidget()
-        self.list_widget.setStyleSheet("""
-            QListWidget {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
+        self.list_widget.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {COLORS['bg_tertiary']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 6px;
                 padding: 8px;
-                color: #e2e8f0;
+                color: {COLORS['text_primary']};
                 font-size: 13px;
-            }
-            QListWidget::item {
-                padding: 8px;
+            }}
+            QListWidget::item {{
+                padding: 10px;
                 border-radius: 4px;
-            }
-            QListWidget::item:hover {
-                background-color: #334155;
-            }
-            QListWidget::item:selected {
-                background-color: #3b82f6;
-            }
+                margin: 2px 0;
+            }}
+            QListWidget::item:hover {{
+                background-color: {COLORS['bg_secondary']};
+            }}
+            QListWidget::item:selected {{
+                background-color: {COLORS['accent_primary']};
+                color: {COLORS['text_primary']};
+            }}
         """)
         layout.addWidget(self.list_widget)
 
@@ -162,18 +188,19 @@ class AppListWidget(QWidget):
         self.remove_btn.clicked.connect(self._remove_selected)
         layout.addWidget(self.remove_btn)
 
-    def add_app(self, app_name: str, app_path: str = ""):
+    def add_app(self, app_name: str, app_path: str = "", icon: QIcon = None):
         """Add an app to the list"""
         if app_name not in self.apps:
             self.apps.append(app_name)
 
-            # Create list item
-            display_text = app_name
-            if app_path:
-                display_text += f"\n{app_path}"
-
-            item = QListWidgetItem(display_text)
+            # Create list item with just the app name
+            item = QListWidgetItem(app_name)
             item.setData(Qt.ItemDataRole.UserRole, app_name)
+
+            # Add icon if provided
+            if icon:
+                item.setIcon(icon)
+
             self.list_widget.addItem(item)
 
     def _remove_selected(self):
@@ -208,38 +235,41 @@ class SessionInfoCard(QFrame):
     def _setup_ui(self, title: str, value: str):
         """Setup UI"""
         self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setStyleSheet("""
-            QFrame {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 12px;
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_tertiary']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 8px;
                 padding: 16px;
-            }
+            }}
         """)
 
         layout = QVBoxLayout(self)
 
         # Title
         self.title_label = QLabel(title)
-        self.title_label.setStyleSheet("""
-            QLabel {
-                color: #94a3b8;
-                font-size: 12px;
-                font-weight: bold;
+        self.title_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_secondary']};
+                font-size: 11px;
+                font-weight: 600;
                 text-transform: uppercase;
-            }
+                letter-spacing: 0.5px;
+                background: transparent;
+            }}
         """)
         layout.addWidget(self.title_label)
 
         # Value
         self.value_label = QLabel(value)
-        self.value_label.setStyleSheet("""
-            QLabel {
-                color: #e2e8f0;
-                font-size: 24px;
-                font-weight: bold;
+        self.value_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_primary']};
+                font-size: 28px;
+                font-weight: 700;
                 margin-top: 8px;
-            }
+                background: transparent;
+            }}
         """)
         layout.addWidget(self.value_label)
 
@@ -260,56 +290,59 @@ class ProgressCard(QFrame):
     def _setup_ui(self, title: str):
         """Setup UI"""
         self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setStyleSheet("""
-            QFrame {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 12px;
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_tertiary']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 8px;
                 padding: 16px;
-            }
+            }}
         """)
 
         layout = QVBoxLayout(self)
 
         # Title
         title_label = QLabel(title)
-        title_label.setStyleSheet("""
-            QLabel {
-                color: #94a3b8;
-                font-size: 12px;
-                font-weight: bold;
+        title_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_secondary']};
+                font-size: 11px;
+                font-weight: 600;
                 text-transform: uppercase;
-            }
+                letter-spacing: 0.5px;
+                background: transparent;
+            }}
         """)
         layout.addWidget(title_label)
 
         # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
+        self.progress_bar.setMinimumHeight(12)
+        self.progress_bar.setStyleSheet(f"""
+            QProgressBar {{
                 border: none;
-                border-radius: 8px;
-                background-color: #334155;
-                height: 8px;
-                margin-top: 8px;
-            }
-            QProgressBar::chunk {
-                border-radius: 8px;
-                background-color: #3b82f6;
-            }
+                border-radius: 6px;
+                background-color: {COLORS['bg_secondary']};
+                margin-top: 12px;
+            }}
+            QProgressBar::chunk {{
+                border-radius: 6px;
+                background-color: {COLORS['accent_primary']};
+            }}
         """)
         layout.addWidget(self.progress_bar)
 
         # Percentage label
         self.label = QLabel("0%")
-        self.label.setStyleSheet("""
-            QLabel {
-                color: #e2e8f0;
-                font-size: 18px;
-                font-weight: bold;
+        self.label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_primary']};
+                font-size: 20px;
+                font-weight: 700;
                 margin-top: 8px;
-            }
+                background: transparent;
+            }}
         """)
         layout.addWidget(self.label)
 
@@ -320,7 +353,7 @@ class ProgressCard(QFrame):
 
 
 class TimePickerWidget(QWidget):
-    """Widget for picking hours and minutes"""
+    """Widget for picking hours and minutes with visible controls"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -331,55 +364,116 @@ class TimePickerWidget(QWidget):
     def _setup_ui(self):
         """Setup UI"""
         layout = QHBoxLayout(self)
+        layout.setSpacing(20)
 
         # Hours
         hours_layout = QVBoxLayout()
         hours_label = QLabel("Hours")
-        hours_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
+        hours_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 13px; font-weight: 600;")
         hours_layout.addWidget(hours_label)
 
         self.hours_spin = QSpinBox()
         self.hours_spin.setRange(0, 23)
         self.hours_spin.setValue(1)
-        self.hours_spin.setStyleSheet("""
-            QSpinBox {
-                background-color: #1e293b;
-                color: #e2e8f0;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 8px;
-                font-size: 18px;
-                font-weight: bold;
-            }
+        self.hours_spin.setMinimumWidth(100)
+        self.hours_spin.setMinimumHeight(50)
+        self.hours_spin.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
+        self.hours_spin.setStyleSheet(f"""
+            QSpinBox {{
+                background-color: {COLORS['bg_tertiary']};
+                color: {COLORS['text_primary']};
+                border: 2px solid {COLORS['border']};
+                border-radius: 6px;
+                padding: 8px 12px;
+                font-size: 24px;
+                font-weight: 700;
+            }}
+            QSpinBox:focus {{
+                border-color: {COLORS['border_focus']};
+            }}
+            QSpinBox::up-button, QSpinBox::down-button {{
+                width: 30px;
+                border: none;
+                background-color: {COLORS['bg_secondary']};
+            }}
+            QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
+                background-color: {COLORS['accent_primary']};
+            }}
+            QSpinBox::up-arrow {{
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-bottom: 5px solid {COLORS['text_primary']};
+                width: 0;
+                height: 0;
+            }}
+            QSpinBox::down-arrow {{
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid {COLORS['text_primary']};
+                width: 0;
+                height: 0;
+            }}
         """)
         hours_layout.addWidget(self.hours_spin)
         layout.addLayout(hours_layout)
 
         # Separator
         separator = QLabel(":")
-        separator.setStyleSheet("color: #94a3b8; font-size: 24px; padding: 0 8px;")
+        separator.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 32px; font-weight: bold; padding: 20px 8px 0 8px;")
         separator.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(separator)
 
         # Minutes
         minutes_layout = QVBoxLayout()
         minutes_label = QLabel("Minutes")
-        minutes_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
+        minutes_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 13px; font-weight: 600;")
         minutes_layout.addWidget(minutes_label)
 
         self.minutes_spin = QSpinBox()
         self.minutes_spin.setRange(0, 59)
-        self.minutes_spin.setValue(0)
-        self.minutes_spin.setStyleSheet("""
-            QSpinBox {
-                background-color: #1e293b;
-                color: #e2e8f0;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 8px;
-                font-size: 18px;
-                font-weight: bold;
-            }
+        self.minutes_spin.setValue(30)
+        self.minutes_spin.setMinimumWidth(100)
+        self.minutes_spin.setMinimumHeight(50)
+        self.minutes_spin.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
+        self.minutes_spin.setStyleSheet(f"""
+            QSpinBox {{
+                background-color: {COLORS['bg_tertiary']};
+                color: {COLORS['text_primary']};
+                border: 2px solid {COLORS['border']};
+                border-radius: 6px;
+                padding: 8px 12px;
+                font-size: 24px;
+                font-weight: 700;
+            }}
+            QSpinBox:focus {{
+                border-color: {COLORS['border_focus']};
+            }}
+            QSpinBox::up-button, QSpinBox::down-button {{
+                width: 30px;
+                border: none;
+                background-color: {COLORS['bg_secondary']};
+            }}
+            QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
+                background-color: {COLORS['accent_primary']};
+            }}
+            QSpinBox::up-arrow {{
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-bottom: 5px solid {COLORS['text_primary']};
+                width: 0;
+                height: 0;
+            }}
+            QSpinBox::down-arrow {{
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid {COLORS['text_primary']};
+                width: 0;
+                height: 0;
+            }}
         """)
         minutes_layout.addWidget(self.minutes_spin)
         layout.addLayout(minutes_layout)
@@ -421,13 +515,14 @@ class MotivationalQuote(QLabel):
         self.setText(self.QUOTES[0])
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setWordWrap(True)
-        self.setStyleSheet("""
-            QLabel {
-                color: #94a3b8;
+        self.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_muted']};
                 font-size: 16px;
                 font-style: italic;
                 padding: 20px;
-            }
+                background: transparent;
+            }}
         """)
 
     def _start_rotation(self):

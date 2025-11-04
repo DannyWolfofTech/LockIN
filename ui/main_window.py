@@ -7,15 +7,15 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QStackedWidget, QLabel, QLineEdit, QMessageBox,
     QListWidget, QListWidgetItem, QScrollArea, QGridLayout,
-    QDialog, QDialogButtonBox
+    QDialog, QDialogButtonBox, QSizeGrip
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize
 from PyQt6.QtGui import QFont, QCloseEvent
 
 from ui.widgets import (
     ModernButton, TimerDisplay, AppListWidget,
     SessionInfoCard, ProgressCard, TimePickerWidget,
-    MotivationalQuote
+    MotivationalQuote, COLORS
 )
 from core.session_manager import SessionManager, SessionState
 from core.stats_tracker import StatsTracker
@@ -31,6 +31,7 @@ class SessionSetupScreen(QWidget):
         super().__init__(parent)
         self.session_manager = session_manager
         self.selected_apps = []
+        self.all_apps = []  # Store all apps for filtering
         self._setup_ui()
 
     def _setup_ui(self):
@@ -42,35 +43,35 @@ class SessionSetupScreen(QWidget):
         # Title
         title = QLabel("Lock In - Start a Focus Session")
         title.setFont(QFont("Segoe UI", 32, QFont.Weight.Bold))
-        title.setStyleSheet("color: #e2e8f0;")
+        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
         # Session name
         name_label = QLabel("Session Name:")
-        name_label.setStyleSheet("color: #94a3b8; font-size: 14px;")
+        name_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 14px; font-weight: 600;")
         layout.addWidget(name_label)
 
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("e.g., Deep Work Session, Study Time, etc.")
-        self.name_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #1e293b;
-                color: #e2e8f0;
-                border: 1px solid #334155;
-                border-radius: 8px;
+        self.name_input.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {COLORS['bg_tertiary']};
+                color: {COLORS['text_primary']};
+                border: 2px solid {COLORS['border']};
+                border-radius: 6px;
                 padding: 12px;
                 font-size: 14px;
-            }
-            QLineEdit:focus {
-                border: 1px solid #3b82f6;
-            }
+            }}
+            QLineEdit:focus {{
+                border-color: {COLORS['border_focus']};
+            }}
         """)
         layout.addWidget(self.name_input)
 
         # Duration picker
         duration_label = QLabel("Session Duration:")
-        duration_label.setStyleSheet("color: #94a3b8; font-size: 14px;")
+        duration_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 14px; font-weight: 600;")
         layout.addWidget(duration_label)
 
         self.time_picker = TimePickerWidget()
@@ -78,35 +79,61 @@ class SessionSetupScreen(QWidget):
 
         # App selection
         apps_label = QLabel("Select Apps to Whitelist:")
-        apps_label.setStyleSheet("color: #94a3b8; font-size: 14px;")
+        apps_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 14px; font-weight: 600;")
         layout.addWidget(apps_label)
 
         # Running apps list and whitelist side by side
         apps_layout = QHBoxLayout()
+        apps_layout.setSpacing(20)
 
         # Running apps column
         running_layout = QVBoxLayout()
-        running_title = QLabel("Running Apps")
-        running_title.setStyleSheet("color: #e2e8f0; font-size: 13px; font-weight: bold;")
+        running_title = QLabel("Available Apps")
+        running_title.setStyleSheet(f"color: {COLORS['text_primary']}; font-size: 14px; font-weight: 600;")
         running_layout.addWidget(running_title)
 
-        self.running_apps_list = QListWidget()
-        self.running_apps_list.setStyleSheet("""
-            QListWidget {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                color: #e2e8f0;
-                padding: 8px;
-            }
-            QListWidget::item {
-                padding: 8px;
-                border-radius: 4px;
-            }
-            QListWidget::item:hover {
-                background-color: #334155;
-            }
+        # Search box
+        self.search_box = QLineEdit()
+        self.search_box.setPlaceholderText("🔍 Search apps...")
+        self.search_box.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {COLORS['bg_tertiary']};
+                color: {COLORS['text_primary']};
+                border: 2px solid {COLORS['border']};
+                border-radius: 6px;
+                padding: 8px 12px;
+                font-size: 13px;
+            }}
+            QLineEdit:focus {{
+                border-color: {COLORS['border_focus']};
+            }}
         """)
+        self.search_box.textChanged.connect(self._filter_apps)
+        running_layout.addWidget(self.search_box)
+
+        self.running_apps_list = QListWidget()
+        self.running_apps_list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {COLORS['bg_tertiary']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 6px;
+                color: {COLORS['text_primary']};
+                padding: 8px;
+                font-size: 13px;
+            }}
+            QListWidget::item {{
+                padding: 10px;
+                border-radius: 4px;
+                margin: 2px 0;
+            }}
+            QListWidget::item:hover {{
+                background-color: {COLORS['bg_secondary']};
+            }}
+            QListWidget::item:selected {{
+                background-color: {COLORS['accent_primary']};
+            }}
+        """)
+        self.running_apps_list.setIconSize(QSize(24, 24))
         running_layout.addWidget(self.running_apps_list)
 
         add_btn = ModernButton("Add to Whitelist →")
@@ -118,6 +145,7 @@ class SessionSetupScreen(QWidget):
         # Whitelisted apps column
         self.whitelist_widget = AppListWidget()
         self.whitelist_widget.app_removed.connect(self._on_app_removed)
+        self.whitelist_widget.list_widget.setIconSize(QSize(24, 24))
         apps_layout.addWidget(self.whitelist_widget)
 
         layout.addLayout(apps_layout)
@@ -139,14 +167,35 @@ class SessionSetupScreen(QWidget):
         # Initial load of running apps
         self._refresh_running_apps()
 
+    def _filter_apps(self, search_text: str):
+        """Filter apps based on search text"""
+        search_lower = search_text.lower()
+        self.running_apps_list.clear()
+
+        for app in self.all_apps:
+            if search_lower in app['display_name'].lower():
+                item = QListWidgetItem(app['display_name'])
+                item.setData(Qt.ItemDataRole.UserRole, app)
+                if app.get('icon'):
+                    item.setIcon(app['icon'])
+                self.running_apps_list.addItem(item)
+
     def _refresh_running_apps(self):
         """Refresh list of running applications"""
         self.running_apps_list.clear()
+        self.all_apps.clear()
 
         running_apps = self.session_manager.app_blocker.get_running_apps()
+        self.all_apps = running_apps
+
         for app in running_apps:
-            item = QListWidgetItem(app['name'])
+            item = QListWidgetItem(app['display_name'])
             item.setData(Qt.ItemDataRole.UserRole, app)
+
+            # Add icon if available
+            if app.get('icon'):
+                item.setIcon(app['icon'])
+
             self.running_apps_list.addItem(item)
 
     def _add_to_whitelist(self):
@@ -154,7 +203,11 @@ class SessionSetupScreen(QWidget):
         current_item = self.running_apps_list.currentItem()
         if current_item:
             app_data = current_item.data(Qt.ItemDataRole.UserRole)
-            self.whitelist_widget.add_app(app_data['name'], app_data['path'])
+            self.whitelist_widget.add_app(
+                app_data['display_name'],
+                app_data['path'],
+                app_data.get('icon')
+            )
 
     def _on_app_removed(self, app_name: str):
         """Handle app removed from whitelist"""
@@ -169,7 +222,7 @@ class SessionSetupScreen(QWidget):
 
         duration_mins = self.time_picker.get_total_minutes()
         if duration_mins <= 0:
-            QMessageBox.warning(self, "Invalid Duration", "Please set a duration greater than 0.")
+            QMessageBox.warning(self, "Invalid Duration", "Please set a duration greater than 0 minutes.")
             return
 
         whitelisted_apps = self.whitelist_widget.get_apps()
@@ -187,13 +240,13 @@ class SessionSetupScreen(QWidget):
     def reset_form(self):
         """Reset form to default state"""
         self.name_input.clear()
-        self.time_picker.set_time(1, 0)
+        self.time_picker.set_time(1, 30)
         self.whitelist_widget.clear_apps()
         self._refresh_running_apps()
 
 
 class LockInScreen(QWidget):
-    """Screen shown during active focus session"""
+    """Screen shown during active focus session - transparent and always on top"""
 
     emergency_exit_requested = pyqtSignal()
 
@@ -206,13 +259,13 @@ class LockInScreen(QWidget):
     def _setup_ui(self):
         """Setup UI components"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(30)
-        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(20)
+        layout.setContentsMargins(30, 30, 30, 30)
 
         # Session name
         self.session_name_label = QLabel()
-        self.session_name_label.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
-        self.session_name_label.setStyleSheet("color: #e2e8f0;")
+        self.session_name_label.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
+        self.session_name_label.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
         self.session_name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.session_name_label)
 
@@ -220,12 +273,13 @@ class LockInScreen(QWidget):
         self.timer_display = TimerDisplay()
         layout.addWidget(self.timer_display)
 
-        # Progress bar
+        # Progress bar card
         self.progress_card = ProgressCard("Session Progress")
         layout.addWidget(self.progress_card)
 
-        # Stats cards
+        # Stats cards in a grid
         stats_layout = QHBoxLayout()
+        stats_layout.setSpacing(15)
 
         self.elapsed_card = SessionInfoCard("Time Elapsed", "00:00")
         stats_layout.addWidget(self.elapsed_card)
@@ -247,8 +301,8 @@ class LockInScreen(QWidget):
         # Emergency exit button
         exit_btn = ModernButton("Emergency Exit", danger=True)
         exit_btn.clicked.connect(self._request_emergency_exit)
-        exit_btn.setMaximumWidth(200)
-        exit_btn.setFont(QFont("Segoe UI", 10))
+        exit_btn.setMaximumWidth(180)
+        exit_btn.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
 
         exit_layout = QHBoxLayout()
         exit_layout.addStretch()
@@ -291,15 +345,16 @@ class LockInScreen(QWidget):
         self.session_name_label.setText(session_info['name'])
         self.blocked_card.set_value("0")
 
-        # Initial update
+        # Initial update with starting values
         self._update_display(0, session_info['duration'])
 
     def _request_emergency_exit(self):
         """Request emergency exit"""
         reply = QMessageBox.warning(
             self, "Emergency Exit",
-            "Are you sure you want to exit early? This will end your focus session.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            "Are you sure you want to exit early?\n\nThis will end your focus session and restore all applications.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
 
         if reply == QMessageBox.StandardButton.Yes:
@@ -322,26 +377,26 @@ class SessionEndScreen(QWidget):
     def _setup_ui(self):
         """Setup UI components"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(20)
+        layout.setSpacing(25)
         layout.setContentsMargins(40, 40, 40, 40)
 
         # Title
         self.title_label = QLabel("Session Complete!")
-        self.title_label.setFont(QFont("Segoe UI", 32, QFont.Weight.Bold))
-        self.title_label.setStyleSheet("color: #10b981;")
+        self.title_label.setFont(QFont("Segoe UI", 36, QFont.Weight.Bold))
+        self.title_label.setStyleSheet(f"color: {COLORS['accent_primary']}; background: transparent;")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.title_label)
 
         # Session name
         self.session_name_label = QLabel()
         self.session_name_label.setFont(QFont("Segoe UI", 18))
-        self.session_name_label.setStyleSheet("color: #94a3b8;")
+        self.session_name_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
         self.session_name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.session_name_label)
 
         # Stats grid
         stats_layout = QGridLayout()
-        stats_layout.setSpacing(15)
+        stats_layout.setSpacing(20)
 
         self.time_card = SessionInfoCard("Time Locked In", "0m")
         stats_layout.addWidget(self.time_card, 0, 0)
@@ -360,14 +415,16 @@ class SessionEndScreen(QWidget):
         # Comparison section
         self.comparison_label = QLabel()
         self.comparison_label.setWordWrap(True)
-        self.comparison_label.setStyleSheet("""
-            QLabel {
-                color: #94a3b8;
-                font-size: 14px;
-                padding: 20px;
-                background-color: #1e293b;
+        self.comparison_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.comparison_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_secondary']};
+                font-size: 15px;
+                padding: 25px;
+                background-color: {COLORS['bg_tertiary']};
+                border: 1px solid {COLORS['border']};
                 border-radius: 8px;
-            }
+            }}
         """)
         layout.addWidget(self.comparison_label)
 
@@ -376,10 +433,6 @@ class SessionEndScreen(QWidget):
         # Buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-
-        view_stats_btn = ModernButton("View Statistics")
-        view_stats_btn.clicked.connect(self.view_stats_requested.emit)
-        button_layout.addWidget(view_stats_btn)
 
         new_session_btn = ModernButton("Start New Session", primary=True)
         new_session_btn.clicked.connect(self.new_session_requested.emit)
@@ -391,10 +444,10 @@ class SessionEndScreen(QWidget):
         """Display session results"""
         if emergency_exit:
             self.title_label.setText("Session Ended Early")
-            self.title_label.setStyleSheet("color: #ef4444;")
+            self.title_label.setStyleSheet(f"color: {COLORS['danger']}; background: transparent;")
         else:
             self.title_label.setText("Session Complete!")
-            self.title_label.setStyleSheet("color: #10b981;")
+            self.title_label.setStyleSheet(f"color: {COLORS['accent_primary']}; background: transparent;")
 
         # Get session details
         session = self.stats_tracker.get_session_details(session_id)
@@ -413,17 +466,17 @@ class SessionEndScreen(QWidget):
         comparison = self.stats_tracker.compare_to_previous(session_id)
         if comparison.get('has_previous'):
             if comparison['time_improved']:
-                comp_text = f"🎉 You locked in {comparison['time_difference_formatted']} longer than last time!"
+                comp_text = f"🎉 You locked in {comparison['time_difference_formatted']} longer than last time!\n\nKeep up the great work!"
             else:
-                comp_text = f"Last session was {comparison['time_difference_formatted']} longer. Keep pushing!"
+                comp_text = f"Last session was {comparison['time_difference_formatted']} longer.\n\nYou'll get it next time!"
         else:
-            comp_text = "This is your first session. Great start! Keep building the habit."
+            comp_text = "This is your first session!\n\nGreat start. Keep building the habit."
 
         self.comparison_label.setText(comp_text)
 
 
 class MainWindow(QMainWindow):
-    """Main application window"""
+    """Main application window with resizable, transparent lock-in screen"""
 
     def __init__(self):
         super().__init__()
@@ -440,17 +493,17 @@ class MainWindow(QMainWindow):
     def _setup_ui(self):
         """Setup main window UI"""
         self.setWindowTitle("Lock In - Focus & Productivity")
-        self.setMinimumSize(1000, 700)
+        self.setMinimumSize(1100, 750)
 
         # Apply dark theme
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #0f172a;
-            }
-            QWidget {
-                background-color: #0f172a;
-                color: #e2e8f0;
-            }
+        self.setStyleSheet(f"""
+            QMainWindow {{
+                background-color: {COLORS['bg_primary']};
+            }}
+            QWidget {{
+                background-color: {COLORS['bg_primary']};
+                color: {COLORS['text_primary']};
+            }}
         """)
 
         # Stack widget for different screens
@@ -508,18 +561,34 @@ class MainWindow(QMainWindow):
         self.lockin_screen.start_display()
         self.stack.setCurrentWidget(self.lockin_screen)
 
+        # Make window semi-transparent and always on top during session
+        self.setWindowOpacity(0.95)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        self.show()
+
         # Prevent closing
         self.allow_close = False
 
     def _emergency_exit(self):
         """Handle emergency exit"""
         self.allow_close = True
+
+        # Restore window properties
+        self.setWindowOpacity(1.0)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
+        self.show()
+
         self.session_manager.end_session(emergency_exit=True)
 
     def _new_session(self):
         """Start a new session"""
         self.setup_screen.reset_form()
         self.stack.setCurrentWidget(self.setup_screen)
+
+        # Restore window properties if changed
+        self.setWindowOpacity(1.0)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
+        self.show()
 
     def _on_session_started(self, session_id: int):
         """Handle session started"""
@@ -528,6 +597,11 @@ class MainWindow(QMainWindow):
     def _on_session_ended(self, session_id: int, emergency_exit: bool):
         """Handle session ended"""
         self.allow_close = True
+
+        # Restore window properties
+        self.setWindowOpacity(1.0)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
+        self.show()
 
         # Show end screen
         self.end_screen.show_results(session_id, emergency_exit)
@@ -538,7 +612,7 @@ class MainWindow(QMainWindow):
         if not self.allow_close and self.session_manager.is_session_active():
             reply = QMessageBox.warning(
                 self, "Session Active",
-                "A focus session is currently active. Use Emergency Exit to end it first.",
+                "A focus session is currently active.\n\nUse Emergency Exit to end it first, or the session will continue in the background.",
                 QMessageBox.StandardButton.Ok
             )
             event.ignore()
