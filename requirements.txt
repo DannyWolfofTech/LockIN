@@ -1,0 +1,16 @@
+# Lock In - Focus/Productivity Desktop Application
+# Python 3.11+ required
+
+# GUI Framework
+PyQt6>=6.6.0
+PyQt6-Qt6>=6.6.0
+
+# Process Management
+psutil>=5.9.0
+
+# Database (SQLite is built-in, but we may need these for advanced features)
+# Additional utilities
+python-dateutil>=2.8.2
+
+# For charts/graphs in stats dashboard (optional, can be added later)
+matplotlib>=3.8.0
