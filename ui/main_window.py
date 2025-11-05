@@ -181,14 +181,15 @@ class SessionSetupScreen(QWidget):
                 self.running_apps_list.addItem(item)
 
     def _refresh_running_apps(self):
-        """Refresh list of running applications"""
+        """Refresh list of ALL available applications (running + installed)"""
         self.running_apps_list.clear()
         self.all_apps.clear()
 
-        running_apps = self.session_manager.app_blocker.get_running_apps()
-        self.all_apps = running_apps
+        # Get ALL installed applications, not just running ones
+        all_apps = self.session_manager.app_blocker.get_all_installed_apps()
+        self.all_apps = all_apps
 
-        for app in running_apps:
+        for app in all_apps:
             item = QListWidgetItem(app['display_name'])
             item.setData(Qt.ItemDataRole.UserRole, app)
 

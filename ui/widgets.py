@@ -235,19 +235,23 @@ class SessionInfoCard(QFrame):
     def _setup_ui(self, title: str, value: str):
         """Setup UI"""
         self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setMinimumHeight(120)  # Ensure adequate height
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLORS['bg_tertiary']};
                 border: 1px solid {COLORS['border']};
                 border-radius: 8px;
-                padding: 16px;
+                padding: 20px;
             }}
         """)
 
         layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
 
         # Title
         self.title_label = QLabel(title)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self.title_label.setStyleSheet(f"""
             QLabel {{
                 color: {COLORS['text_secondary']};
@@ -256,22 +260,28 @@ class SessionInfoCard(QFrame):
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
                 background: transparent;
+                padding: 0;
+                margin: 0;
             }}
         """)
         layout.addWidget(self.title_label)
 
         # Value
         self.value_label = QLabel(value)
+        self.value_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.value_label.setWordWrap(True)
         self.value_label.setStyleSheet(f"""
             QLabel {{
                 color: {COLORS['text_primary']};
-                font-size: 28px;
+                font-size: 32px;
                 font-weight: 700;
-                margin-top: 8px;
                 background: transparent;
+                padding: 0;
+                margin: 0;
             }}
         """)
         layout.addWidget(self.value_label)
+        layout.addStretch()
 
     def set_value(self, value: str):
         """Update card value"""
@@ -290,19 +300,23 @@ class ProgressCard(QFrame):
     def _setup_ui(self, title: str):
         """Setup UI"""
         self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setMinimumHeight(140)  # Ensure adequate height
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLORS['bg_tertiary']};
                 border: 1px solid {COLORS['border']};
                 border-radius: 8px;
-                padding: 16px;
+                padding: 20px;
             }}
         """)
 
         layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
 
         # Title
         title_label = QLabel(title)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         title_label.setStyleSheet(f"""
             QLabel {{
                 color: {COLORS['text_secondary']};
@@ -311,6 +325,8 @@ class ProgressCard(QFrame):
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
                 background: transparent;
+                padding: 0;
+                margin: 0;
             }}
         """)
         layout.addWidget(title_label)
@@ -318,16 +334,17 @@ class ProgressCard(QFrame):
         # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setMinimumHeight(12)
+        self.progress_bar.setMinimumHeight(16)
+        self.progress_bar.setMaximumHeight(16)
+        self.progress_bar.setValue(0)
         self.progress_bar.setStyleSheet(f"""
             QProgressBar {{
                 border: none;
-                border-radius: 6px;
+                border-radius: 8px;
                 background-color: {COLORS['bg_secondary']};
-                margin-top: 12px;
             }}
             QProgressBar::chunk {{
-                border-radius: 6px;
+                border-radius: 8px;
                 background-color: {COLORS['accent_primary']};
             }}
         """)
@@ -335,16 +352,19 @@ class ProgressCard(QFrame):
 
         # Percentage label
         self.label = QLabel("0%")
+        self.label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.label.setStyleSheet(f"""
             QLabel {{
                 color: {COLORS['text_primary']};
-                font-size: 20px;
+                font-size: 24px;
                 font-weight: 700;
-                margin-top: 8px;
                 background: transparent;
+                padding: 0;
+                margin: 0;
             }}
         """)
         layout.addWidget(self.label)
+        layout.addStretch()
 
     def set_progress(self, value: int):
         """Set progress value (0-100)"""
@@ -353,7 +373,7 @@ class ProgressCard(QFrame):
 
 
 class TimePickerWidget(QWidget):
-    """Widget for picking hours and minutes with visible controls"""
+    """Widget for picking hours and minutes with compact, professional controls"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -364,56 +384,48 @@ class TimePickerWidget(QWidget):
     def _setup_ui(self):
         """Setup UI"""
         layout = QHBoxLayout(self)
-        layout.setSpacing(20)
+        layout.setSpacing(15)
 
         # Hours
         hours_layout = QVBoxLayout()
         hours_label = QLabel("Hours")
-        hours_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 13px; font-weight: 600;")
+        hours_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 12px; font-weight: 600; background: transparent;")
         hours_layout.addWidget(hours_label)
 
         self.hours_spin = QSpinBox()
         self.hours_spin.setRange(0, 23)
         self.hours_spin.setValue(1)
-        self.hours_spin.setMinimumWidth(100)
-        self.hours_spin.setMinimumHeight(50)
-        self.hours_spin.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
+        self.hours_spin.setMinimumWidth(80)
+        self.hours_spin.setMinimumHeight(36)
+        self.hours_spin.setMaximumHeight(36)
+        self.hours_spin.setButtonSymbols(QSpinBox.ButtonSymbols.PlusMinus)
         self.hours_spin.setStyleSheet(f"""
             QSpinBox {{
                 background-color: {COLORS['bg_tertiary']};
                 color: {COLORS['text_primary']};
                 border: 2px solid {COLORS['border']};
                 border-radius: 6px;
-                padding: 8px 12px;
-                font-size: 24px;
-                font-weight: 700;
+                padding: 6px 10px;
+                font-size: 18px;
+                font-weight: 600;
             }}
             QSpinBox:focus {{
                 border-color: {COLORS['border_focus']};
             }}
             QSpinBox::up-button, QSpinBox::down-button {{
-                width: 30px;
+                width: 18px;
                 border: none;
                 background-color: {COLORS['bg_secondary']};
+                border-radius: 3px;
             }}
             QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
                 background-color: {COLORS['accent_primary']};
             }}
-            QSpinBox::up-arrow {{
-                image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-bottom: 5px solid {COLORS['text_primary']};
-                width: 0;
-                height: 0;
+            QSpinBox::up-button {{
+                subcontrol-position: right;
             }}
-            QSpinBox::down-arrow {{
-                image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 5px solid {COLORS['text_primary']};
-                width: 0;
-                height: 0;
+            QSpinBox::down-button {{
+                subcontrol-position: left;
             }}
         """)
         hours_layout.addWidget(self.hours_spin)
@@ -421,58 +433,50 @@ class TimePickerWidget(QWidget):
 
         # Separator
         separator = QLabel(":")
-        separator.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 32px; font-weight: bold; padding: 20px 8px 0 8px;")
+        separator.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 24px; font-weight: bold; padding: 18px 6px 0 6px; background: transparent;")
         separator.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(separator)
 
         # Minutes
         minutes_layout = QVBoxLayout()
         minutes_label = QLabel("Minutes")
-        minutes_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 13px; font-weight: 600;")
+        minutes_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 12px; font-weight: 600; background: transparent;")
         minutes_layout.addWidget(minutes_label)
 
         self.minutes_spin = QSpinBox()
         self.minutes_spin.setRange(0, 59)
         self.minutes_spin.setValue(30)
-        self.minutes_spin.setMinimumWidth(100)
-        self.minutes_spin.setMinimumHeight(50)
-        self.minutes_spin.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
+        self.minutes_spin.setMinimumWidth(80)
+        self.minutes_spin.setMinimumHeight(36)
+        self.minutes_spin.setMaximumHeight(36)
+        self.minutes_spin.setButtonSymbols(QSpinBox.ButtonSymbols.PlusMinus)
         self.minutes_spin.setStyleSheet(f"""
             QSpinBox {{
                 background-color: {COLORS['bg_tertiary']};
                 color: {COLORS['text_primary']};
                 border: 2px solid {COLORS['border']};
                 border-radius: 6px;
-                padding: 8px 12px;
-                font-size: 24px;
-                font-weight: 700;
+                padding: 6px 10px;
+                font-size: 18px;
+                font-weight: 600;
             }}
             QSpinBox:focus {{
                 border-color: {COLORS['border_focus']};
             }}
             QSpinBox::up-button, QSpinBox::down-button {{
-                width: 30px;
+                width: 18px;
                 border: none;
                 background-color: {COLORS['bg_secondary']};
+                border-radius: 3px;
             }}
             QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
                 background-color: {COLORS['accent_primary']};
             }}
-            QSpinBox::up-arrow {{
-                image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-bottom: 5px solid {COLORS['text_primary']};
-                width: 0;
-                height: 0;
+            QSpinBox::up-button {{
+                subcontrol-position: right;
             }}
-            QSpinBox::down-arrow {{
-                image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 5px solid {COLORS['text_primary']};
-                width: 0;
-                height: 0;
+            QSpinBox::down-button {{
+                subcontrol-position: left;
             }}
         """)
         minutes_layout.addWidget(self.minutes_spin)

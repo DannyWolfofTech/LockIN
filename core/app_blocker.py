@@ -474,6 +474,136 @@ class AppBlocker(QObject):
 
         return sorted(apps, key=lambda x: x['display_name'].lower())
 
+    def get_all_installed_apps(self) -> List[Dict[str, str]]:
+        """
+        Get ALL installed applications on the system (running + installed)
+
+        Returns:
+            List of dicts with 'name', 'display_name', 'path', and 'icon' keys
+        """
+        apps = {}  # Use dict to avoid duplicates, keyed by display_name
+
+        # First, get all running apps
+        running_apps = self.get_running_apps()
+        for app in running_apps:
+            apps[app['display_name']] = app
+
+        # Then scan common installation directories
+        install_dirs = []
+
+        if sys.platform == 'win32':
+            # Windows installation directories
+            install_dirs = [
+                'C:\\Program Files',
+                'C:\\Program Files (x86)',
+                os.path.expanduser('~\\AppData\\Local\\Programs'),
+                os.path.expanduser('~\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs'),
+            ]
+        elif sys.platform.startswith('linux'):
+            # Linux application directories
+            install_dirs = [
+                '/usr/share/applications',
+                '/usr/local/share/applications',
+                os.path.expanduser('~/.local/share/applications'),
+            ]
+        elif sys.platform == 'darwin':
+            # macOS application directories
+            install_dirs = [
+                '/Applications',
+                '/System/Applications',
+                os.path.expanduser('~/Applications'),
+            ]
+
+        # Scan installation directories
+        for base_dir in install_dirs:
+            if not os.path.exists(base_dir):
+                continue
+
+            try:
+                # For Windows, look for .exe files
+                if sys.platform == 'win32':
+                    for root, dirs, files in os.walk(base_dir):
+                        # Limit depth to avoid scanning too deep
+                        depth = root[len(base_dir):].count(os.sep)
+                        if depth > 2:
+                            continue
+
+                        for file in files:
+                            if file.lower().endswith('.exe') and file.lower() != 'uninstall.exe':
+                                exe_path = os.path.join(root, file)
+
+                                # Skip system processes
+                                if self._is_system_process(file, exe_path):
+                                    continue
+
+                                # Get friendly name
+                                display_name = self._get_friendly_app_name(file, exe_path)
+
+                                # Skip if already in our list
+                                if display_name in apps:
+                                    continue
+
+                                # Try to get icon
+                                icon = self._get_app_icon(exe_path)
+
+                                apps[display_name] = {
+                                    'name': file,
+                                    'display_name': display_name,
+                                    'path': exe_path,
+                                    'icon': icon
+                                }
+
+                # For Linux, look for .desktop files
+                elif sys.platform.startswith('linux'):
+                    for file in os.listdir(base_dir):
+                        if file.endswith('.desktop'):
+                            desktop_path = os.path.join(base_dir, file)
+                            # Parse .desktop file to get app name and executable
+                            try:
+                                with open(desktop_path, 'r') as f:
+                                    lines = f.readlines()
+                                    app_name = None
+                                    exec_path = None
+                                    for line in lines:
+                                        if line.startswith('Name='):
+                                            app_name = line.split('=', 1)[1].strip()
+                                        elif line.startswith('Exec='):
+                                            exec_path = line.split('=', 1)[1].strip()
+
+                                    if app_name and app_name not in apps:
+                                        icon = self._get_app_icon(exec_path if exec_path else '')
+                                        apps[app_name] = {
+                                            'name': app_name,
+                                            'display_name': app_name,
+                                            'path': exec_path or '',
+                                            'icon': icon
+                                        }
+                            except:
+                                continue
+
+                # For macOS, look for .app bundles
+                elif sys.platform == 'darwin':
+                    for item in os.listdir(base_dir):
+                        if item.endswith('.app'):
+                            app_path = os.path.join(base_dir, item)
+                            app_name = item[:-4]  # Remove .app extension
+
+                            if app_name not in apps:
+                                icon = self._get_app_icon(app_path)
+                                apps[app_name] = {
+                                    'name': item,
+                                    'display_name': app_name,
+                                    'path': app_path,
+                                    'icon': icon
+                                }
+
+            except Exception as e:
+                # Continue on error, don't break the whole scan
+                continue
+
+        # Convert dict to sorted list
+        return sorted(apps.values(), key=lambda x: x['display_name'].lower())
+
     def close_all_non_whitelisted_apps(self) -> int:
         """
         Close all non-whitelisted applications immediately
