@@ -28,6 +28,7 @@ COLORS = {
     'text_secondary': '#a1a1aa',  # Light gray text
     'text_muted': '#71717a',      # Muted gray
     'border': '#10b981',          # Emerald green borders
+    'border_focus': '#10b981',    # Emerald green for focused borders
     'border_subtle': '#404040',   # Subtle borders
 }
 
