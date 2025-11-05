@@ -10,12 +10,12 @@ from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QSizeGrip
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize
-from PyQt6.QtGui import QFont, QCloseEvent
+from PyQt6.QtGui import QFont, QCloseEvent, QColor
 
 from ui.widgets import (
     ModernButton, TimerDisplay, AppListWidget,
     SessionInfoCard, ProgressCard, TimePickerWidget,
-    MotivationalQuote, COLORS
+    MotivationalQuote, ModernCard, COLORS
 )
 from core.session_manager import SessionManager, SessionState
 from core.stats_tracker import StatsTracker
@@ -77,76 +77,85 @@ class SessionSetupScreen(QWidget):
         self.time_picker = TimePickerWidget()
         layout.addWidget(self.time_picker)
 
-        # App selection
+        # App selection with PREMIUM CARD DESIGN
         apps_label = QLabel("Select Apps to Whitelist:")
-        apps_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 14px; font-weight: 600;")
+        apps_label.setStyleSheet(f"color: {COLORS['text_primary']}; font-size: 16px; font-weight: 700; margin-top: 12px;")
         layout.addWidget(apps_label)
 
-        # Running apps list and whitelist side by side
+        # Running apps list and whitelist side by side - BIGGER LAYOUT
         apps_layout = QHBoxLayout()
         apps_layout.setSpacing(20)
 
-        # Running apps column
+        # Running apps column - Takes 60% of space
         running_layout = QVBoxLayout()
+        running_layout.setSpacing(12)
+
         running_title = QLabel("Available Apps")
-        running_title.setStyleSheet(f"color: {COLORS['text_primary']}; font-size: 14px; font-weight: 600;")
+        running_title.setStyleSheet(f"color: {COLORS['text_primary']}; font-size: 15px; font-weight: 700; background: transparent;")
         running_layout.addWidget(running_title)
 
-        # Search box
+        # Search box with MODERN DESIGN
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("🔍 Search apps...")
+        self.search_box.setMinimumHeight(40)
         self.search_box.setStyleSheet(f"""
             QLineEdit {{
-                background-color: {COLORS['bg_tertiary']};
+                background-color: {COLORS['bg_secondary']};
                 color: {COLORS['text_primary']};
-                border: 2px solid {COLORS['border']};
-                border-radius: 6px;
-                padding: 8px 12px;
-                font-size: 13px;
+                border: 1px solid {COLORS['border']};
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-size: 14px;
             }}
             QLineEdit:focus {{
-                border-color: {COLORS['border_focus']};
+                border: 2px solid {COLORS['accent_primary']};
             }}
         """)
         self.search_box.textChanged.connect(self._filter_apps)
         running_layout.addWidget(self.search_box)
 
+        # Available apps list - PREMIUM CARD DESIGN
         self.running_apps_list = QListWidget()
+        self.running_apps_list.setMinimumHeight(450)  # MUCH BIGGER
         self.running_apps_list.setStyleSheet(f"""
             QListWidget {{
-                background-color: {COLORS['bg_tertiary']};
+                background-color: {COLORS['bg_secondary']};
                 border: 1px solid {COLORS['border']};
-                border-radius: 6px;
+                border-radius: 12px;
                 color: {COLORS['text_primary']};
-                padding: 8px;
-                font-size: 13px;
+                padding: 12px;
+                font-size: 14px;
             }}
             QListWidget::item {{
-                padding: 10px;
-                border-radius: 4px;
-                margin: 2px 0;
+                padding: 14px;
+                border-radius: 8px;
+                margin: 4px 0;
+                min-height: 40px;
             }}
             QListWidget::item:hover {{
-                background-color: {COLORS['bg_secondary']};
+                background-color: {COLORS['bg_tertiary']};
+                border-left: 4px solid {COLORS['accent_primary']};
             }}
             QListWidget::item:selected {{
                 background-color: {COLORS['accent_primary']};
+                color: {COLORS['text_primary']};
             }}
         """)
-        self.running_apps_list.setIconSize(QSize(24, 24))
+        self.running_apps_list.setIconSize(QSize(28, 28))
         running_layout.addWidget(self.running_apps_list)
 
-        add_btn = ModernButton("Add to Whitelist →")
+        add_btn = ModernButton("Add to Whitelist →", primary=False)
         add_btn.clicked.connect(self._add_to_whitelist)
         running_layout.addWidget(add_btn)
 
-        apps_layout.addLayout(running_layout)
+        apps_layout.addLayout(running_layout, 60)  # 60% of space
 
-        # Whitelisted apps column
+        # Whitelisted apps column - Takes 40% of space
         self.whitelist_widget = AppListWidget()
         self.whitelist_widget.app_removed.connect(self._on_app_removed)
-        self.whitelist_widget.list_widget.setIconSize(QSize(24, 24))
-        apps_layout.addWidget(self.whitelist_widget)
+        self.whitelist_widget.list_widget.setIconSize(QSize(28, 28))
+        self.whitelist_widget.list_widget.setMinimumHeight(450)
+        apps_layout.addWidget(self.whitelist_widget, 40)  # 40% of space
 
         layout.addLayout(apps_layout)
 
@@ -181,21 +190,42 @@ class SessionSetupScreen(QWidget):
                 self.running_apps_list.addItem(item)
 
     def _refresh_running_apps(self):
-        """Refresh list of ALL available applications (running + installed)"""
+        """Refresh list of ALL available applications (running + installed) - RUNNING APPS FIRST"""
         self.running_apps_list.clear()
         self.all_apps.clear()
 
-        # Get ALL installed applications, not just running ones
-        all_apps = self.session_manager.app_blocker.get_all_installed_apps()
+        # Get ALL installed applications + currently running apps
+        all_installed = self.session_manager.app_blocker.get_all_installed_apps()
+        running_apps = self.session_manager.app_blocker.get_running_apps()
+
+        # Create a set of running app names for quick lookup
+        running_names = {app['display_name'] for app in running_apps}
+
+        # Sort: running apps first (priority 0), then installed apps (priority 1)
+        # Within each group, sort alphabetically by display name
+        all_apps = sorted(all_installed, key=lambda x: (
+            0 if x['display_name'] in running_names else 1,
+            x['display_name'].lower()
+        ))
+
         self.all_apps = all_apps
 
         for app in all_apps:
-            item = QListWidgetItem(app['display_name'])
+            is_running = app['display_name'] in running_names
+
+            # Add visual indicator for running apps
+            display_text = f"● {app['display_name']}" if is_running else app['display_name']
+
+            item = QListWidgetItem(display_text)
             item.setData(Qt.ItemDataRole.UserRole, app)
 
             # Add icon if available
             if app.get('icon'):
                 item.setIcon(app['icon'])
+
+            # Style running apps differently
+            if is_running:
+                item.setForeground(QColor(COLORS['accent_primary']))
 
             self.running_apps_list.addItem(item)
 
@@ -413,7 +443,11 @@ class SessionEndScreen(QWidget):
 
         layout.addLayout(stats_layout)
 
-        # Comparison section
+        # Comparison section - PREMIUM CARD DESIGN with shadow
+        comparison_card = ModernCard()
+        comparison_layout = QVBoxLayout(comparison_card)
+        comparison_layout.setContentsMargins(30, 30, 30, 30)
+
         self.comparison_label = QLabel()
         self.comparison_label.setWordWrap(True)
         self.comparison_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -421,13 +455,13 @@ class SessionEndScreen(QWidget):
             QLabel {{
                 color: {COLORS['text_secondary']};
                 font-size: 15px;
-                padding: 25px;
-                background-color: {COLORS['bg_tertiary']};
-                border: 1px solid {COLORS['border']};
-                border-radius: 8px;
+                background: transparent;
+                line-height: 1.6;
             }}
         """)
-        layout.addWidget(self.comparison_label)
+        comparison_layout.addWidget(self.comparison_label)
+
+        layout.addWidget(comparison_card)
 
         layout.addStretch()
 
