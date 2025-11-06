@@ -40,7 +40,7 @@ def main(page: ft.Page):
     # UI Controls
     search_text = ft.TextField(
         label="Search apps...",
-        prefix_icon=ft.icons.SEARCH,
+        prefix_icon="search",
         border_color="#10b981",
         focused_border_color="#059669",
         on_change=lambda _: update_available_list()
@@ -136,13 +136,13 @@ def main(page: ft.Page):
                 available_list.controls.append(
                     ft.Container(
                         content=ft.ListTile(
-                            leading=ft.Icon(ft.icons.APPS, color="#10b981"),
+                            leading=ft.Icon("apps", color="#10b981"),
                             title=ft.Text(
                                 app['display_name'],
                                 color="#10b981" if is_running else ft.colors.WHITE
                             ),
                             trailing=ft.IconButton(
-                                icon=ft.icons.ADD_CIRCLE_OUTLINE,
+                                icon="add_circle_outline",
                                 icon_color="#10b981",
                                 on_click=lambda _, a=app: add_to_whitelist(a)
                             ),
@@ -167,10 +167,10 @@ def main(page: ft.Page):
                 whitelisted_list.controls.append(
                     ft.Container(
                         content=ft.ListTile(
-                            leading=ft.Icon(ft.icons.APPS, color="#10b981"),
+                            leading=ft.Icon("apps", color="#10b981"),
                             title=ft.Text(app['display_name']),
                             trailing=ft.IconButton(
-                                icon=ft.icons.REMOVE_CIRCLE_OUTLINE,
+                                icon="remove_circle_outline",
                                 icon_color="#ef4444",
                                 on_click=lambda _, a=app: remove_from_whitelist(a['display_name'])
                             ),
@@ -390,14 +390,14 @@ def main(page: ft.Page):
                         [
                             ft.ElevatedButton(
                                 "Refresh Apps",
-                                icon=ft.icons.REFRESH,
+                                icon="refresh",
                                 bgcolor="#3a3a3a",
                                 color=ft.colors.WHITE,
                                 on_click=refresh_apps_click
                             ),
                             ft.ElevatedButton(
                                 "Start Session",
-                                icon=ft.icons.PLAY_ARROW,
+                                icon="play_arrow",
                                 bgcolor="#10b981",
                                 color=ft.colors.WHITE,
                                 on_click=start_session_click
@@ -498,7 +498,7 @@ def main(page: ft.Page):
                                 ft.Text("Stay focused. You've got this! 💪", size=18, color=ft.colors.WHITE70, italic=True),
                                 ft.ElevatedButton(
                                     "Emergency Exit",
-                                    icon=ft.icons.EXIT_TO_APP,
+                                    icon="exit_to_app",
                                     bgcolor="#ef4444",
                                     color=ft.colors.WHITE,
                                     on_click=emergency_exit_click
@@ -629,7 +629,7 @@ def main(page: ft.Page):
                                 ),
                                 ft.ElevatedButton(
                                     "Start New Session",
-                                    icon=ft.icons.REFRESH,
+                                    icon="refresh",
                                     bgcolor="#10b981",
                                     color=ft.colors.WHITE,
                                     on_click=lambda _: page.go("/")
