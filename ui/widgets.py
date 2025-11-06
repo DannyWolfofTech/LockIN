@@ -83,7 +83,6 @@ class ModernButton(QPushButton):
                 }}
                 QPushButton:hover {{
                     background-color: {COLORS['accent_hover']};
-                    transform: scale(1.02);
                 }}
                 QPushButton:pressed {{
                     background-color: {COLORS['accent_pressed']};
