@@ -34,28 +34,28 @@ COLORS = {
 
 
 class ModernCard(QFrame):
-    """Base card widget with modern design - border, shadow, elevation"""
+    """Base card widget with clean, minimal design - no green borders"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._setup_style()
 
     def _setup_style(self):
-        """Setup modern card styling"""
+        """Setup modern card styling - SIMPLIFIED, no green borders"""
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLORS['bg_secondary']};
-                border: 1px solid {COLORS['border']};
+                border: 1px solid {COLORS['border_subtle']};
                 border-radius: 12px;
             }}
         """)
 
-        # Add shadow effect for depth
+        # Add subtle shadow effect for depth
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 100))
-        shadow.setOffset(0, 4)
+        shadow.setBlurRadius(15)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setOffset(0, 2)
         self.setGraphicsEffect(shadow)
 
 
@@ -403,10 +403,10 @@ class TimePickerWidget(QWidget):
         self.hours_spin = QSpinBox()
         self.hours_spin.setRange(0, 23)
         self.hours_spin.setValue(1)
-        self.hours_spin.setMinimumWidth(90)
-        self.hours_spin.setMinimumHeight(42)
-        self.hours_spin.setMaximumHeight(42)
-        self.hours_spin.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
+        self.hours_spin.setMinimumWidth(100)
+        self.hours_spin.setMinimumHeight(50)
+        self.hours_spin.setMaximumHeight(50)
+        self.hours_spin.setButtonSymbols(QSpinBox.ButtonSymbols.PlusMinus)  # Use +/- symbols
         self.hours_spin.setStyleSheet(f"""
             QSpinBox {{
                 background-color: {COLORS['bg_secondary']};
@@ -422,41 +422,40 @@ class TimePickerWidget(QWidget):
             }}
             QSpinBox::up-button {{
                 subcontrol-origin: border;
-                subcontrol-position: top right;
-                width: 24px;
+                subcontrol-position: right;
+                width: 30px;
+                height: 23px;
                 border-left: 1px solid {COLORS['border_subtle']};
                 border-top-right-radius: 8px;
                 background-color: {COLORS['bg_tertiary']};
+                font-size: 18px;
+                font-weight: bold;
             }}
             QSpinBox::up-button:hover {{
                 background-color: {COLORS['accent_primary']};
+                color: {COLORS['text_primary']};
+            }}
+            QSpinBox::up-button:pressed {{
+                background-color: {COLORS['accent_pressed']};
             }}
             QSpinBox::down-button {{
                 subcontrol-origin: border;
-                subcontrol-position: bottom right;
-                width: 24px;
-                border-left: 1px solid {COLORS['border_subtle']};
-                border-bottom-right-radius: 8px;
+                subcontrol-position: left;
+                width: 30px;
+                height: 23px;
+                border-right: 1px solid {COLORS['border_subtle']};
+                border-top-left-radius: 8px;
+                border-bottom-left-radius: 8px;
                 background-color: {COLORS['bg_tertiary']};
+                font-size: 18px;
+                font-weight: bold;
             }}
             QSpinBox::down-button:hover {{
                 background-color: {COLORS['accent_primary']};
+                color: {COLORS['text_primary']};
             }}
-            QSpinBox::up-arrow {{
-                image: none;
-                width: 0;
-                height: 0;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-bottom: 8px solid {COLORS['text_primary']};
-            }}
-            QSpinBox::down-arrow {{
-                image: none;
-                width: 0;
-                height: 0;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 8px solid {COLORS['text_primary']};
+            QSpinBox::down-button:pressed {{
+                background-color: {COLORS['accent_pressed']};
             }}
         """)
         hours_layout.addWidget(self.hours_spin)
@@ -492,10 +491,10 @@ class TimePickerWidget(QWidget):
         self.minutes_spin = QSpinBox()
         self.minutes_spin.setRange(0, 59)
         self.minutes_spin.setValue(30)
-        self.minutes_spin.setMinimumWidth(90)
-        self.minutes_spin.setMinimumHeight(42)
-        self.minutes_spin.setMaximumHeight(42)
-        self.minutes_spin.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
+        self.minutes_spin.setMinimumWidth(100)
+        self.minutes_spin.setMinimumHeight(50)
+        self.minutes_spin.setMaximumHeight(50)
+        self.minutes_spin.setButtonSymbols(QSpinBox.ButtonSymbols.PlusMinus)  # Use +/- symbols
         self.minutes_spin.setStyleSheet(f"""
             QSpinBox {{
                 background-color: {COLORS['bg_secondary']};
@@ -511,41 +510,40 @@ class TimePickerWidget(QWidget):
             }}
             QSpinBox::up-button {{
                 subcontrol-origin: border;
-                subcontrol-position: top right;
-                width: 24px;
+                subcontrol-position: right;
+                width: 30px;
+                height: 23px;
                 border-left: 1px solid {COLORS['border_subtle']};
                 border-top-right-radius: 8px;
                 background-color: {COLORS['bg_tertiary']};
+                font-size: 18px;
+                font-weight: bold;
             }}
             QSpinBox::up-button:hover {{
                 background-color: {COLORS['accent_primary']};
+                color: {COLORS['text_primary']};
+            }}
+            QSpinBox::up-button:pressed {{
+                background-color: {COLORS['accent_pressed']};
             }}
             QSpinBox::down-button {{
                 subcontrol-origin: border;
-                subcontrol-position: bottom right;
-                width: 24px;
-                border-left: 1px solid {COLORS['border_subtle']};
-                border-bottom-right-radius: 8px;
+                subcontrol-position: left;
+                width: 30px;
+                height: 23px;
+                border-right: 1px solid {COLORS['border_subtle']};
+                border-top-left-radius: 8px;
+                border-bottom-left-radius: 8px;
                 background-color: {COLORS['bg_tertiary']};
+                font-size: 18px;
+                font-weight: bold;
             }}
             QSpinBox::down-button:hover {{
                 background-color: {COLORS['accent_primary']};
+                color: {COLORS['text_primary']};
             }}
-            QSpinBox::up-arrow {{
-                image: none;
-                width: 0;
-                height: 0;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-bottom: 8px solid {COLORS['text_primary']};
-            }}
-            QSpinBox::down-arrow {{
-                image: none;
-                width: 0;
-                height: 0;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 8px solid {COLORS['text_primary']};
+            QSpinBox::down-button:pressed {{
+                background-color: {COLORS['accent_pressed']};
             }}
         """)
         minutes_layout.addWidget(self.minutes_spin)

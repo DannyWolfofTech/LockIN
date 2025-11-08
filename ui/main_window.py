@@ -615,10 +615,22 @@ class MainWindow(QMainWindow):
         self.lockin_screen.start_display()
         self.stack.setCurrentWidget(self.lockin_screen)
 
-        # Make window semi-transparent and always on top during session
-        self.setWindowOpacity(0.95)
-        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
-        self.show()
+        # Make window FULLSCREEN and always on top
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint
+        )
+        self.showFullScreen()  # Fullscreen mode
+
+        # Make background FULLY TRANSPARENT - stat boxes will still be visible
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        # Only make the lock-in screen's own background transparent, not child widgets
+        self.lockin_screen.setAutoFillBackground(False)
+        self.lockin_screen.setStyleSheet("""
+            LockInScreen {
+                background-color: transparent;
+            }
+        """)
 
         # Prevent closing
         self.allow_close = False
@@ -628,9 +640,9 @@ class MainWindow(QMainWindow):
         self.allow_close = True
 
         # Restore window properties
-        self.setWindowOpacity(1.0)
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
-        self.show()
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        self.setWindowFlags(Qt.WindowType.Window)  # Restore normal window flags
+        self.showNormal()  # Exit fullscreen
 
         self.session_manager.end_session(emergency_exit=True)
 
@@ -640,9 +652,9 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(self.setup_screen)
 
         # Restore window properties if changed
-        self.setWindowOpacity(1.0)
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
-        self.show()
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        self.setWindowFlags(Qt.WindowType.Window)  # Restore normal window flags
+        self.showNormal()  # Exit fullscreen
 
     def _on_session_started(self, session_id: int):
         """Handle session started"""
@@ -653,9 +665,9 @@ class MainWindow(QMainWindow):
         self.allow_close = True
 
         # Restore window properties
-        self.setWindowOpacity(1.0)
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
-        self.show()
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        self.setWindowFlags(Qt.WindowType.Window)  # Restore normal window flags
+        self.showNormal()  # Exit fullscreen
 
         # Show end screen
         self.end_screen.show_results(session_id, emergency_exit)
