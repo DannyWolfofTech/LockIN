@@ -60,11 +60,13 @@ class AppBlocker(QObject):
     }
 
     # Additional processes to always whitelist - system services and background tasks
+    # AGGRESSIVE FILTERING - Hide from Available Apps list (but don't terminate)
     SYSTEM_WHITELIST = {
         # Security and System Tools
         'antimalware service executable', 'windows defender',
         'securityhealthservice.exe', 'msmpeng.exe', 'msedge_pwahelper.exe',
-        'windows security notification icon', 'sgrmbroker.exe',
+        'windows security notification icon', 'sgrmbroker.exe', 'securityhealthsystray.exe',
+        'securityhealthhost.exe',
 
         # Essential Windows Services
         'runtimebroker.exe', 'searchindexer.exe', 'spoolsv.exe',
@@ -84,11 +86,64 @@ class AppBlocker(QObject):
         # Drivers and Hardware
         'nvdisplay.container.exe', 'nvcontainer.exe', 'amdrsserv.exe',
         'radiergw.exe', 'igfxem.exe', 'igfxtray.exe', 'hkcmd.exe',
-        'atkexcomsvc.exe', 'asustptloader.exe',
+        'atkexcomsvc.exe', 'asustptloader.exe', 'winring0', 'winring0.exe',
+        'winring0x64.sys', 'winring0_1_2_0', 'frameviewsdk.exe',
 
         # Background System Tasks
         'useroobebroker.exe', 'searchprotocolhost.exe', 'searchfilterhost.exe',
         'compattelrunner.exe', 'oobe.exe', 'cloudexperiencehostbroker.exe',
+
+        # Chromium Embedded Framework (CEF) - used by apps like Discord, VS Code
+        'cef', 'cefsharp.browsersubprocess.exe', 'cefsharp', 'libcef.dll',
+
+        # .NET and Runtime Components
+        'mscorsvw.exe', 'ngen.exe', 'ngentask.exe', 'clr.dll',
+        'dotnet.exe', 'msbuild.exe',
+
+        # Windows Background Services
+        'gamebarpresencewriter.exe', 'gamebar.exe', 'xboxstat.exe',
+        'smartscreen.exe', 'fmapi.exe', 'phoneexperiencehost.exe',
+        'yourphone.exe', 'windowsinternalshellexperiencehost.exe',
+
+        # Windows Notifications & UI
+        'notificationcontroller.exe', 'notificationplatform.exe',
+        'actioncenter.exe', 'cortana.exe', 'msteams', 'skype',
+
+        # System Utilities (hide from user)
+        'perfmon.exe', 'resmon.exe', 'mmc.exe', 'eventvwr.exe',
+        'certutil.exe', 'netsh.exe', 'powershell.exe', 'cmd.exe',
+        'powershell_ise.exe', 'wscript.exe', 'cscript.exe',
+
+        # Driver Framework & Support
+        'wudfhost.exe', 'wudfrd.exe', 'sdiagnhost.exe', 'systemsettingsbroker.exe',
+        'systemsettings.exe', 'settingssynchost.exe',
+
+        # Windows Subsystem for Linux
+        'wsl.exe', 'wslhost.exe', 'wslconfig.exe',
+
+        # Third-Party Background Processes (common utilities that auto-start)
+        'teamviewer', 'anydesk', 'logmein', 'ammyy', 'vnc',
+        'googlecrashhandler.exe', 'googleupdate.exe',
+        'adobearm.exe', 'adobeupdater.exe', 'acrotray.exe',
+        'dropbox.exe', 'onedrive.exe', 'icloud', 'googledrive',
+        'carbonblack', 'crowdstrike', 'sentinelone', 'cylance',
+
+        # GPU and Display Management
+        'nvstreamservice.exe', 'nvstreamsvc.exe', 'nvprofileupdaterservice64.exe',
+        'nvidia web helper.exe', 'nvidia share.exe', 'shadowplay',
+        'amd', 'radeon', 'ati', 'amdow.exe', 'radeonsoftware.exe',
+
+        # Audio/Video Services
+        'iastoricon.exe', 'realtekhdaudiomanager.exe', 'nahimicservice.exe',
+
+        # Antivirus and Security (hide background processes)
+        'avast', 'avg', 'malwarebytes', 'norton', 'mcafee',
+        'kaspersky', 'bitdefender', 'avira', 'eset', 'sophos',
+        'trendmicro', 'webroot', 'comodo',
+
+        # System Management (Dell, HP, Lenovo, etc.)
+        'dell', 'hp', 'lenovo', 'asus', 'acer', 'toshiba',
+        'samsungmagician', 'intelrapidstoragetechnology',
     }
 
     # System paths to exclude (processes in these folders are usually system processes)
@@ -353,14 +408,31 @@ class AppBlocker(QObject):
                 if exe_path_lower.startswith(sys_path.lower()):
                     return True
 
-        # Filter out common background processes and services
+        # AGGRESSIVE FILTERING - Filter out common background processes and services
         system_keywords = [
             'service', 'host', 'broker', 'helper', 'installer', 'update',
-            'driver', 'daemon', 'agent', 'notif', 'manager', 'loader'
+            'driver', 'daemon', 'agent', 'notif', 'manager', 'loader',
+            'crash', 'reporter', 'handler', 'sync', 'protocol', 'filter',
+            'compatibility', 'telemetry', 'diagnostics', 'feedback',
+            'framework', 'sdk', 'runtime', 'subprocess', 'wrapper',
+            'watchdog', 'monitor', 'launcher', 'bootstrapper', 'pwa',
         ]
         for keyword in system_keywords:
-            if keyword in name_lower and not exe_path:
+            if keyword in name_lower:
                 return True
+
+        # Filter out processes with certain patterns (more aggressive)
+        # Filter CEF (Chromium Embedded Framework) subprocesses
+        if 'cef' in name_lower or 'renderer' in name_lower or 'gpu-process' in name_lower:
+            return True
+
+        # Filter crash/error handlers
+        if 'crash' in name_lower or 'dump' in name_lower or 'error' in name_lower:
+            return True
+
+        # Filter updaters
+        if 'updat' in name_lower or 'download' in name_lower:
+            return True
 
         return False
 

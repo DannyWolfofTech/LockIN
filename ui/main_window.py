@@ -7,10 +7,10 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QStackedWidget, QLabel, QLineEdit, QMessageBox,
     QListWidget, QListWidgetItem, QScrollArea, QGridLayout,
-    QDialog, QDialogButtonBox, QSizeGrip
+    QDialog, QDialogButtonBox, QSizeGrip, QApplication
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize
-from PyQt6.QtGui import QFont, QCloseEvent, QColor
+from PyQt6.QtGui import QFont, QCloseEvent, QColor, QScreen
 
 from ui.widgets import (
     ModernButton, TimerDisplay, AppListWidget,
@@ -114,9 +114,9 @@ class SessionSetupScreen(QWidget):
         self.search_box.textChanged.connect(self._filter_apps)
         running_layout.addWidget(self.search_box)
 
-        # Available apps list - PREMIUM CARD DESIGN
+        # Available apps list - PREMIUM CARD DESIGN - INCREASED HEIGHT
         self.running_apps_list = QListWidget()
-        self.running_apps_list.setMinimumHeight(450)  # MUCH BIGGER
+        self.running_apps_list.setMinimumHeight(550)  # EVEN BIGGER to prevent overlap
         self.running_apps_list.setStyleSheet(f"""
             QListWidget {{
                 background-color: {COLORS['bg_secondary']};
@@ -142,11 +142,14 @@ class SessionSetupScreen(QWidget):
             }}
         """)
         self.running_apps_list.setIconSize(QSize(28, 28))
-        running_layout.addWidget(self.running_apps_list)
+        running_layout.addWidget(self.running_apps_list, 1)  # Give it stretch factor
+
+        # Add spacing before button to prevent overlap
+        running_layout.addSpacing(15)
 
         add_btn = ModernButton("Add to Whitelist →", primary=False)
         add_btn.clicked.connect(self._add_to_whitelist)
-        running_layout.addWidget(add_btn)
+        running_layout.addWidget(add_btn, 0)  # Don't stretch the button
 
         apps_layout.addLayout(running_layout, 60)  # 60% of space
 
@@ -154,7 +157,7 @@ class SessionSetupScreen(QWidget):
         self.whitelist_widget = AppListWidget()
         self.whitelist_widget.app_removed.connect(self._on_app_removed)
         self.whitelist_widget.list_widget.setIconSize(QSize(28, 28))
-        self.whitelist_widget.list_widget.setMinimumHeight(450)
+        self.whitelist_widget.list_widget.setMinimumHeight(550)  # Match available apps height
         apps_layout.addWidget(self.whitelist_widget, 40)  # 40% of space
 
         layout.addLayout(apps_layout)
@@ -528,7 +531,23 @@ class MainWindow(QMainWindow):
     def _setup_ui(self):
         """Setup main window UI"""
         self.setWindowTitle("Lock In - Focus & Productivity")
-        self.setMinimumSize(1100, 750)
+
+        # Make window 90% of screen size (fullscreen-ish)
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_geometry = screen.availableGeometry()
+            width = int(screen_geometry.width() * 0.9)
+            height = int(screen_geometry.height() * 0.9)
+
+            # Center the window
+            x = (screen_geometry.width() - width) // 2
+            y = (screen_geometry.height() - height) // 2
+
+            self.setGeometry(x, y, width, height)
+        else:
+            # Fallback if screen detection fails
+            self.setMinimumSize(1100, 750)
+            self.resize(1400, 900)
 
         # Apply dark theme
         self.setStyleSheet(f"""
