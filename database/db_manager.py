@@ -46,9 +46,30 @@ class DatabaseManager:
             cursor.executescript(schema_sql)
             self.connection.commit()
 
+            # Run migrations for existing databases
+            self._run_migrations()
+
         except sqlite3.Error as e:
             print(f"Database initialization error: {e}")
             raise
+
+    def _run_migrations(self) -> None:
+        """Run database migrations for schema updates"""
+        try:
+            cursor = self.connection.cursor()
+
+            # Migration 1: Add notes column if it doesn't exist
+            cursor.execute("PRAGMA table_info(sessions)")
+            columns = [column[1] for column in cursor.fetchall()]
+
+            if 'notes' not in columns:
+                cursor.execute("ALTER TABLE sessions ADD COLUMN notes TEXT DEFAULT ''")
+                self.connection.commit()
+                print("Migration: Added 'notes' column to sessions table")
+
+        except sqlite3.Error as e:
+            print(f"Migration error: {e}")
+            # Don't raise - migrations are optional upgrades
 
     def close(self) -> None:
         """Close database connection"""

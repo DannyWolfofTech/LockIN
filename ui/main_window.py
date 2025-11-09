@@ -15,7 +15,8 @@ from PyQt6.QtGui import QFont, QCloseEvent, QColor, QScreen
 from ui.widgets import (
     ModernButton, TimerDisplay, AppListWidget,
     SessionInfoCard, ProgressCard, TimePickerWidget,
-    MotivationalQuote, ModernCard, VerticalSidebarLockIn, COLORS
+    MotivationalQuote, ModernCard, VerticalSidebarLockIn,
+    QuickStatsPopup, SessionNotesPopup, COLORS
 )
 from core.session_manager import SessionManager, SessionState
 from core.stats_tracker import StatsTracker
@@ -466,6 +467,40 @@ class SessionEndScreen(QWidget):
 
         layout.addWidget(comparison_card)
 
+        # Session notes section - PREMIUM CARD DESIGN
+        self.notes_card = ModernCard()
+        notes_layout = QVBoxLayout(self.notes_card)
+        notes_layout.setContentsMargins(30, 30, 30, 30)
+
+        notes_title = QLabel("📝 Session Notes")
+        notes_title.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_primary']};
+                font-size: 18px;
+                font-weight: 700;
+                background: transparent;
+                margin-bottom: 10px;
+            }}
+        """)
+        notes_layout.addWidget(notes_title)
+
+        self.notes_label = QLabel("No notes for this session.")
+        self.notes_label.setWordWrap(True)
+        self.notes_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.notes_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_secondary']};
+                font-size: 14px;
+                background: transparent;
+                line-height: 1.5;
+                padding: 10px;
+            }}
+        """)
+        notes_layout.addWidget(self.notes_label)
+
+        layout.addWidget(self.notes_card)
+        self.notes_card.hide()  # Initially hidden, show only if notes exist
+
         layout.addStretch()
 
         # Buttons
@@ -511,6 +546,14 @@ class SessionEndScreen(QWidget):
             comp_text = "This is your first session!\n\nGreat start. Keep building the habit."
 
         self.comparison_label.setText(comp_text)
+
+        # Show session notes if they exist
+        notes = session.get('notes', '')
+        if notes and notes.strip():
+            self.notes_label.setText(notes)
+            self.notes_card.show()
+        else:
+            self.notes_card.hide()
 
 
 class MainWindow(QMainWindow):
@@ -571,6 +614,10 @@ class MainWindow(QMainWindow):
         # Create vertical sidebar (separate window, not in stack)
         self.sidebar = VerticalSidebarLockIn(self.session_manager)
 
+        # Create popup widgets
+        self.stats_popup = QuickStatsPopup(self.session_manager, self.stats_tracker)
+        self.notes_popup = SessionNotesPopup(self.session_manager)
+
         # Add screens to stack (sidebar is NOT in stack - it's its own window)
         self.stack.addWidget(self.setup_screen)
         self.stack.addWidget(self.end_screen)
@@ -585,6 +632,11 @@ class MainWindow(QMainWindow):
 
         # Vertical sidebar signals
         self.sidebar.emergency_exit_requested.connect(self._emergency_exit)
+        self.sidebar.stats_button.clicked.connect(self._show_stats_popup)
+        self.sidebar.notes_button.clicked.connect(self._show_notes_popup)
+
+        # Popup signals
+        self.notes_popup.notes_saved.connect(self._on_notes_saved)
 
         # End screen signals
         self.end_screen.new_session_requested.connect(self._new_session)
@@ -668,6 +720,18 @@ class MainWindow(QMainWindow):
         # Show end screen
         self.end_screen.show_results(session_id, emergency_exit)
         self.stack.setCurrentWidget(self.end_screen)
+
+    def _show_stats_popup(self):
+        """Show the quick stats popup"""
+        self.stats_popup.show_stats()
+
+    def _show_notes_popup(self):
+        """Show the session notes popup"""
+        self.notes_popup.show_notes()
+
+    def _on_notes_saved(self, notes: str):
+        """Handle notes saved"""
+        print(f"Session notes saved: {notes[:50]}...")  # Log first 50 chars
 
     def closeEvent(self, event: QCloseEvent):
         """Handle window close event"""

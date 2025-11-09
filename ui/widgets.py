@@ -851,6 +851,306 @@ class VerticalSidebarLockIn(QWidget):
         self.activateWindow()
 
 
+class QuickStatsPopup(QWidget):
+    """Quick stats popup showing current session statistics"""
+
+    view_full_history_requested = pyqtSignal()
+
+    def __init__(self, session_manager, stats_tracker, parent=None):
+        super().__init__(parent)
+        self.session_manager = session_manager
+        self.stats_tracker = stats_tracker
+        self._setup_ui()
+        self._setup_window_properties()
+
+    def _setup_window_properties(self):
+        """Setup window properties"""
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setFixedWidth(350)
+
+    def _setup_ui(self):
+        """Setup UI"""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # Container with styling
+        container = QWidget()
+        container.setStyleSheet(f"""
+            QWidget {{
+                background-color: {COLORS['bg_secondary']};
+                border: 2px solid {COLORS['accent_primary']};
+                border-radius: 12px;
+            }}
+        """)
+
+        container_layout = QVBoxLayout(container)
+        container_layout.setSpacing(15)
+        container_layout.setContentsMargins(20, 20, 20, 20)
+
+        # Title
+        title = QLabel("📊 Quick Stats")
+        title.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_primary']};
+                font-size: 20px;
+                font-weight: 700;
+                background: transparent;
+            }}
+        """)
+        container_layout.addWidget(title)
+
+        # Stats labels
+        self.elapsed_label = QLabel("Time Elapsed: --:--:--")
+        self.remaining_label = QLabel("Time Remaining: --:--:--")
+        self.blocked_label = QLabel("Apps Blocked: 0")
+        self.completion_label = QLabel("Completion: 0%")
+        self.comparison_label = QLabel("")
+
+        for label in [self.elapsed_label, self.remaining_label, self.blocked_label,
+                     self.completion_label, self.comparison_label]:
+            label.setStyleSheet(f"""
+                QLabel {{
+                    color: {COLORS['text_primary']};
+                    font-size: 14px;
+                    padding: 5px;
+                    background: transparent;
+                }}
+            """)
+            container_layout.addWidget(label)
+
+        # View Full History button
+        history_btn = ModernButton("View Full History", primary=True)
+        history_btn.clicked.connect(self._view_full_history)
+        container_layout.addWidget(history_btn)
+
+        # Close button
+        close_btn = ModernButton("Close")
+        close_btn.clicked.connect(self.hide)
+        container_layout.addWidget(close_btn)
+
+        layout.addWidget(container)
+
+    def show_stats(self):
+        """Update and show stats"""
+        session_info = self.session_manager.get_session_info()
+
+        if session_info:
+            # Time elapsed
+            elapsed = session_info.get('elapsed', 0)
+            hours = elapsed // 3600
+            minutes = (elapsed % 3600) // 60
+            seconds = elapsed % 60
+            self.elapsed_label.setText(f"Time Elapsed: {hours:02d}:{minutes:02d}:{seconds:02d}")
+
+            # Time remaining
+            remaining = session_info.get('remaining', 0)
+            hours = remaining // 3600
+            minutes = (remaining % 3600) // 60
+            seconds = remaining % 60
+            self.remaining_label.setText(f"Time Remaining: {hours:02d}:{minutes:02d}:{seconds:02d}")
+
+            # Apps blocked
+            blocked_count = session_info.get('apps_blocked', 0)
+            self.blocked_label.setText(f"Apps Blocked: {blocked_count}")
+
+            # Completion percentage
+            total_duration = session_info.get('duration', 1)
+            if total_duration > 0:
+                completion = int((elapsed / total_duration) * 100)
+                self.completion_label.setText(f"Completion: {completion}%")
+
+            # Comparison to previous session
+            prev_session = self.stats_tracker.get_previous_session()
+            if prev_session:
+                prev_duration = prev_session.get('time_locked_in_seconds', 0)
+                if prev_duration > 0 and elapsed > prev_duration:
+                    diff = elapsed - prev_duration
+                    diff_mins = diff // 60
+                    self.comparison_label.setText(
+                        f"🔥 {diff_mins} mins longer than last session!"
+                    )
+                    self.comparison_label.setStyleSheet(f"""
+                        QLabel {{
+                            color: {COLORS['accent_primary']};
+                            font-size: 14px;
+                            font-weight: 600;
+                            padding: 5px;
+                            background: transparent;
+                        }}
+                    """)
+                else:
+                    self.comparison_label.setText("")
+
+        # Position near right side of screen
+        from PyQt6.QtWidgets import QApplication
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_geometry = screen.availableGeometry()
+            x = screen_geometry.width() - self.width() - 100
+            y = screen_geometry.height() // 2 - self.height() // 2
+            self.move(x, y)
+
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _view_full_history(self):
+        """Request to view full history"""
+        self.view_full_history_requested.emit()
+        self.hide()
+
+
+class SessionNotesPopup(QWidget):
+    """Session notes popup for taking notes during session"""
+
+    notes_saved = pyqtSignal(str)
+
+    def __init__(self, session_manager, parent=None):
+        super().__init__(parent)
+        self.session_manager = session_manager
+        self._setup_ui()
+        self._setup_window_properties()
+
+    def _setup_window_properties(self):
+        """Setup window properties"""
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setFixedWidth(400)
+        self.setFixedHeight(350)
+
+    def _setup_ui(self):
+        """Setup UI"""
+        from PyQt6.QtWidgets import QTextEdit
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # Container with styling
+        container = QWidget()
+        container.setStyleSheet(f"""
+            QWidget {{
+                background-color: {COLORS['bg_secondary']};
+                border: 2px solid {COLORS['accent_primary']};
+                border-radius: 12px;
+            }}
+        """)
+
+        container_layout = QVBoxLayout(container)
+        container_layout.setSpacing(15)
+        container_layout.setContentsMargins(20, 20, 20, 20)
+
+        # Title
+        title = QLabel("📝 Session Notes")
+        title.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_primary']};
+                font-size: 20px;
+                font-weight: 700;
+                background: transparent;
+            }}
+        """)
+        container_layout.addWidget(title)
+
+        # Instructions
+        instructions = QLabel("What are you working on?")
+        instructions.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_secondary']};
+                font-size: 13px;
+                background: transparent;
+            }}
+        """)
+        container_layout.addWidget(instructions)
+
+        # Text input
+        self.notes_input = QTextEdit()
+        self.notes_input.setPlaceholderText("Type your notes here...")
+        self.notes_input.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {COLORS['bg_tertiary']};
+                color: {COLORS['text_primary']};
+                border: 1px solid {COLORS['border_subtle']};
+                border-radius: 8px;
+                padding: 12px;
+                font-size: 14px;
+                line-height: 1.5;
+            }}
+            QTextEdit:focus {{
+                border: 2px solid {COLORS['accent_primary']};
+            }}
+        """)
+        container_layout.addWidget(self.notes_input)
+
+        # Button layout
+        button_layout = QHBoxLayout()
+
+        # Save button
+        save_btn = ModernButton("Save Notes", primary=True)
+        save_btn.clicked.connect(self._save_notes)
+        button_layout.addWidget(save_btn)
+
+        # Close button
+        close_btn = ModernButton("Close")
+        close_btn.clicked.connect(self.hide)
+        button_layout.addWidget(close_btn)
+
+        container_layout.addLayout(button_layout)
+
+        layout.addWidget(container)
+
+    def show_notes(self):
+        """Show notes popup and load existing notes"""
+        session_info = self.session_manager.get_session_info()
+        if session_info:
+            # Load existing notes if any
+            existing_notes = session_info.get('notes', '')
+            self.notes_input.setPlainText(existing_notes)
+
+        # Position near right side of screen
+        from PyQt6.QtWidgets import QApplication
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_geometry = screen.availableGeometry()
+            x = screen_geometry.width() - self.width() - 100
+            y = screen_geometry.height() // 2 - self.height() // 2
+            self.move(x, y)
+
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        self.notes_input.setFocus()
+
+    def _save_notes(self):
+        """Save notes to session"""
+        notes = self.notes_input.toPlainText()
+
+        # Update session with notes
+        session_info = self.session_manager.get_session_info()
+        if session_info and session_info.get('session_id'):
+            self.session_manager.update_session_notes(notes)
+            self.notes_saved.emit(notes)
+
+            # Show confirmation
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self,
+                "Notes Saved",
+                "Your session notes have been saved!",
+                QMessageBox.StandardButton.Ok
+            )
+
+        self.hide()
+
+
 class MotivationalQuote(QLabel):
     """Premium motivational quote widget"""
 

@@ -310,6 +310,20 @@ class StatsTracker:
             'last_session_date': max(session_dates).isoformat() if session_dates else None
         }
 
+    def get_previous_session(self) -> Dict[str, Any]:
+        """
+        Get the most recent completed session
+
+        Returns:
+            Previous session data or None
+        """
+        sessions = self.db_manager.get_all_sessions(limit=2)
+        if len(sessions) >= 2:
+            return sessions[1]  # Second most recent (first is current/latest)
+        elif len(sessions) == 1:
+            return sessions[0]  # Only one session exists
+        return None
+
     def compare_to_previous(self, session_id: int) -> Dict[str, Any]:
         """
         Compare a session to the previous one
