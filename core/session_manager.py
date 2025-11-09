@@ -258,6 +258,16 @@ class SessionManager(QObject):
         Returns:
             Dictionary with session info
         """
+        # Get notes from database if session exists
+        notes = ""
+        if self.session_id:
+            try:
+                session_data = self.db_manager.get_session(self.session_id)
+                if session_data:
+                    notes = session_data.get('notes', '')
+            except Exception as e:
+                print(f"Error getting session notes: {e}")
+
         return {
             'session_id': self.session_id,
             'name': self.session_name,
@@ -267,8 +277,31 @@ class SessionManager(QObject):
             'remaining': self.get_remaining_time(),
             'progress': self.get_progress_percentage(),
             'apps_blocked': self.apps_blocked_count,
-            'whitelisted_apps': self.whitelisted_apps.copy()
+            'whitelisted_apps': self.whitelisted_apps.copy(),
+            'notes': notes
         }
+
+    def update_session_notes(self, notes: str) -> bool:
+        """
+        Update session notes in real-time
+
+        Args:
+            notes: Notes text to save
+
+        Returns:
+            True if updated successfully
+        """
+        try:
+            if self.session_id:
+                self.db_manager.update_session(
+                    session_id=self.session_id,
+                    notes=notes
+                )
+                return True
+            return False
+        except Exception as e:
+            print(f"Error updating session notes: {e}")
+            return False
 
     def reset(self) -> None:
         """Reset session manager to idle state"""

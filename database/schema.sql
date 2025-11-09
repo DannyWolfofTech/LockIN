@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     description TEXT,
+    notes TEXT DEFAULT '', -- Session notes/journal taken during session
     duration_seconds INTEGER NOT NULL,
     time_locked_in_seconds INTEGER NOT NULL DEFAULT 0,
     apps_whitelisted TEXT NOT NULL, -- JSON string of whitelisted apps

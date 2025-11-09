@@ -34,28 +34,28 @@ COLORS = {
 
 
 class ModernCard(QFrame):
-    """Base card widget with modern design - border, shadow, elevation"""
+    """Base card widget with clean, minimal design - no green borders"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._setup_style()
 
     def _setup_style(self):
-        """Setup modern card styling"""
+        """Setup modern card styling - SIMPLIFIED, no green borders"""
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLORS['bg_secondary']};
-                border: 1px solid {COLORS['border']};
+                border: 1px solid {COLORS['border_subtle']};
                 border-radius: 12px;
             }}
         """)
 
-        # Add shadow effect for depth
+        # Add subtle shadow effect for depth
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 100))
-        shadow.setOffset(0, 4)
+        shadow.setBlurRadius(15)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setOffset(0, 2)
         self.setGraphicsEffect(shadow)
 
 
@@ -403,10 +403,10 @@ class TimePickerWidget(QWidget):
         self.hours_spin = QSpinBox()
         self.hours_spin.setRange(0, 23)
         self.hours_spin.setValue(1)
-        self.hours_spin.setMinimumWidth(90)
-        self.hours_spin.setMinimumHeight(42)
-        self.hours_spin.setMaximumHeight(42)
-        self.hours_spin.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
+        self.hours_spin.setMinimumWidth(100)
+        self.hours_spin.setMinimumHeight(50)
+        self.hours_spin.setMaximumHeight(50)
+        self.hours_spin.setButtonSymbols(QSpinBox.ButtonSymbols.PlusMinus)  # Use +/- symbols
         self.hours_spin.setStyleSheet(f"""
             QSpinBox {{
                 background-color: {COLORS['bg_secondary']};
@@ -422,41 +422,40 @@ class TimePickerWidget(QWidget):
             }}
             QSpinBox::up-button {{
                 subcontrol-origin: border;
-                subcontrol-position: top right;
-                width: 24px;
+                subcontrol-position: right;
+                width: 30px;
+                height: 23px;
                 border-left: 1px solid {COLORS['border_subtle']};
                 border-top-right-radius: 8px;
                 background-color: {COLORS['bg_tertiary']};
+                font-size: 18px;
+                font-weight: bold;
             }}
             QSpinBox::up-button:hover {{
                 background-color: {COLORS['accent_primary']};
+                color: {COLORS['text_primary']};
+            }}
+            QSpinBox::up-button:pressed {{
+                background-color: {COLORS['accent_pressed']};
             }}
             QSpinBox::down-button {{
                 subcontrol-origin: border;
-                subcontrol-position: bottom right;
-                width: 24px;
-                border-left: 1px solid {COLORS['border_subtle']};
-                border-bottom-right-radius: 8px;
+                subcontrol-position: left;
+                width: 30px;
+                height: 23px;
+                border-right: 1px solid {COLORS['border_subtle']};
+                border-top-left-radius: 8px;
+                border-bottom-left-radius: 8px;
                 background-color: {COLORS['bg_tertiary']};
+                font-size: 18px;
+                font-weight: bold;
             }}
             QSpinBox::down-button:hover {{
                 background-color: {COLORS['accent_primary']};
+                color: {COLORS['text_primary']};
             }}
-            QSpinBox::up-arrow {{
-                image: none;
-                width: 0;
-                height: 0;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-bottom: 8px solid {COLORS['text_primary']};
-            }}
-            QSpinBox::down-arrow {{
-                image: none;
-                width: 0;
-                height: 0;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 8px solid {COLORS['text_primary']};
+            QSpinBox::down-button:pressed {{
+                background-color: {COLORS['accent_pressed']};
             }}
         """)
         hours_layout.addWidget(self.hours_spin)
@@ -492,10 +491,10 @@ class TimePickerWidget(QWidget):
         self.minutes_spin = QSpinBox()
         self.minutes_spin.setRange(0, 59)
         self.minutes_spin.setValue(30)
-        self.minutes_spin.setMinimumWidth(90)
-        self.minutes_spin.setMinimumHeight(42)
-        self.minutes_spin.setMaximumHeight(42)
-        self.minutes_spin.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
+        self.minutes_spin.setMinimumWidth(100)
+        self.minutes_spin.setMinimumHeight(50)
+        self.minutes_spin.setMaximumHeight(50)
+        self.minutes_spin.setButtonSymbols(QSpinBox.ButtonSymbols.PlusMinus)  # Use +/- symbols
         self.minutes_spin.setStyleSheet(f"""
             QSpinBox {{
                 background-color: {COLORS['bg_secondary']};
@@ -511,41 +510,40 @@ class TimePickerWidget(QWidget):
             }}
             QSpinBox::up-button {{
                 subcontrol-origin: border;
-                subcontrol-position: top right;
-                width: 24px;
+                subcontrol-position: right;
+                width: 30px;
+                height: 23px;
                 border-left: 1px solid {COLORS['border_subtle']};
                 border-top-right-radius: 8px;
                 background-color: {COLORS['bg_tertiary']};
+                font-size: 18px;
+                font-weight: bold;
             }}
             QSpinBox::up-button:hover {{
                 background-color: {COLORS['accent_primary']};
+                color: {COLORS['text_primary']};
+            }}
+            QSpinBox::up-button:pressed {{
+                background-color: {COLORS['accent_pressed']};
             }}
             QSpinBox::down-button {{
                 subcontrol-origin: border;
-                subcontrol-position: bottom right;
-                width: 24px;
-                border-left: 1px solid {COLORS['border_subtle']};
-                border-bottom-right-radius: 8px;
+                subcontrol-position: left;
+                width: 30px;
+                height: 23px;
+                border-right: 1px solid {COLORS['border_subtle']};
+                border-top-left-radius: 8px;
+                border-bottom-left-radius: 8px;
                 background-color: {COLORS['bg_tertiary']};
+                font-size: 18px;
+                font-weight: bold;
             }}
             QSpinBox::down-button:hover {{
                 background-color: {COLORS['accent_primary']};
+                color: {COLORS['text_primary']};
             }}
-            QSpinBox::up-arrow {{
-                image: none;
-                width: 0;
-                height: 0;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-bottom: 8px solid {COLORS['text_primary']};
-            }}
-            QSpinBox::down-arrow {{
-                image: none;
-                width: 0;
-                height: 0;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 8px solid {COLORS['text_primary']};
+            QSpinBox::down-button:pressed {{
+                background-color: {COLORS['accent_pressed']};
             }}
         """)
         minutes_layout.addWidget(self.minutes_spin)
@@ -559,6 +557,598 @@ class TimePickerWidget(QWidget):
         """Set time values"""
         self.hours_spin.setValue(hours)
         self.minutes_spin.setValue(minutes)
+
+
+class VerticalSidebarLockIn(QWidget):
+    """
+    Vertical sidebar lock-in screen - taskbar style
+    Modern, professional sidebar that docks to the right (or left) side of screen
+    """
+
+    emergency_exit_requested = pyqtSignal()
+
+    def __init__(self, session_manager, parent=None):
+        super().__init__(parent)
+        self.session_manager = session_manager
+        self.countdown_mode = True  # True = countdown, False = count-up
+        self.position_right = True  # True = right side, False = left side
+        self.minimized = False
+
+        self._setup_ui()
+        self._setup_window_properties()
+        self._connect_signals()
+
+    def _setup_window_properties(self):
+        """Setup window to be a floating sidebar"""
+        # Make it a frameless, always-on-top window
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool  # Doesn't show in taskbar
+        )
+
+        # Set fixed width
+        self.setFixedWidth(80)
+
+        # Position on right side of screen
+        self._position_sidebar()
+
+    def _position_sidebar(self):
+        """Position sidebar on right or left side of screen"""
+        from PyQt6.QtWidgets import QApplication
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_geometry = screen.availableGeometry()
+
+            # Full height
+            height = screen_geometry.height()
+            self.setFixedHeight(height)
+
+            if self.position_right:
+                # Right side
+                x = screen_geometry.width() - 80
+            else:
+                # Left side
+                x = 0
+
+            y = 0
+            self.move(x, y)
+
+    def _setup_ui(self):
+        """Setup the sidebar UI"""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Sidebar container
+        self.sidebar_container = QWidget()
+        self.sidebar_container.setStyleSheet(f"""
+            QWidget {{
+                background-color: {COLORS['bg_secondary']};
+                border-left: 1px solid {COLORS['border_subtle']};
+            }}
+        """)
+
+        sidebar_layout = QVBoxLayout(self.sidebar_container)
+        sidebar_layout.setSpacing(20)
+        sidebar_layout.setContentsMargins(10, 20, 10, 20)
+
+        # 1. TIMER DISPLAY (Top)
+        self.timer_label = QLabel("00:00:00")
+        self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.timer_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['accent_primary']};
+                font-size: 20px;
+                font-weight: 700;
+                background: transparent;
+                padding: 10px 5px;
+            }}
+        """)
+        sidebar_layout.addWidget(self.timer_label)
+
+        # Progress bar (vertical)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setOrientation(Qt.Orientation.Vertical)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setFixedHeight(100)
+        self.progress_bar.setStyleSheet(f"""
+            QProgressBar {{
+                border: none;
+                border-radius: 4px;
+                background-color: {COLORS['bg_tertiary']};
+            }}
+            QProgressBar::chunk {{
+                border-radius: 4px;
+                background-color: {COLORS['accent_primary']};
+            }}
+        """)
+        sidebar_layout.addWidget(self.progress_bar)
+
+        # Mode toggle button (countdown/count-up)
+        self.mode_button = QPushButton("⏱")
+        self.mode_button.setFixedSize(40, 40)
+        self.mode_button.setToolTip("Toggle countdown/count-up")
+        self.mode_button.setStyleSheet(self._get_icon_button_style())
+        self.mode_button.clicked.connect(self._toggle_timer_mode)
+        sidebar_layout.addWidget(self.mode_button, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # Spacer
+        sidebar_layout.addSpacing(20)
+
+        # 2. ICON BUTTONS (Middle section)
+
+        # Settings button
+        self.settings_button = QPushButton("⚙")
+        self.settings_button.setFixedSize(40, 40)
+        self.settings_button.setToolTip("Settings")
+        self.settings_button.setStyleSheet(self._get_icon_button_style())
+        sidebar_layout.addWidget(self.settings_button, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # Stats button
+        self.stats_button = QPushButton("📊")
+        self.stats_button.setFixedSize(40, 40)
+        self.stats_button.setToolTip("Quick Stats")
+        self.stats_button.setStyleSheet(self._get_icon_button_style())
+        sidebar_layout.addWidget(self.stats_button, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # Notes button
+        self.notes_button = QPushButton("📝")
+        self.notes_button.setFixedSize(40, 40)
+        self.notes_button.setToolTip("Session Notes")
+        self.notes_button.setStyleSheet(self._get_icon_button_style())
+        sidebar_layout.addWidget(self.notes_button, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # Minimize button
+        self.minimize_button = QPushButton("➖")
+        self.minimize_button.setFixedSize(40, 40)
+        self.minimize_button.setToolTip("Minimize to timer only")
+        self.minimize_button.setStyleSheet(self._get_icon_button_style())
+        self.minimize_button.clicked.connect(self._toggle_minimize)
+        sidebar_layout.addWidget(self.minimize_button, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # Spacer to push exit button to bottom
+        sidebar_layout.addStretch()
+
+        # 3. EMERGENCY EXIT (Bottom)
+        self.exit_button = QPushButton("✕")
+        self.exit_button.setFixedSize(50, 50)
+        self.exit_button.setToolTip("Emergency Exit Session")
+        self.exit_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['danger']};
+                color: {COLORS['text_primary']};
+                border: none;
+                border-radius: 25px;
+                font-size: 24px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['danger_hover']};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS['danger_pressed']};
+            }}
+        """)
+        self.exit_button.clicked.connect(self._request_emergency_exit)
+        sidebar_layout.addWidget(self.exit_button, 0, Qt.AlignmentFlag.AlignCenter)
+
+        layout.addWidget(self.sidebar_container)
+
+    def _get_icon_button_style(self) -> str:
+        """Get stylesheet for icon buttons"""
+        return f"""
+            QPushButton {{
+                background-color: {COLORS['bg_tertiary']};
+                color: {COLORS['text_secondary']};
+                border: 1px solid {COLORS['border_subtle']};
+                border-radius: 20px;
+                font-size: 20px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['accent_primary']};
+                color: {COLORS['text_primary']};
+                border-color: {COLORS['accent_primary']};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS['accent_pressed']};
+            }}
+        """
+
+    def _connect_signals(self):
+        """Connect session manager signals"""
+        self.session_manager.session_updated.connect(self._update_display)
+        self.session_manager.app_blocked.connect(self._on_app_blocked)
+
+    def _toggle_timer_mode(self):
+        """Toggle between countdown and count-up modes"""
+        self.countdown_mode = not self.countdown_mode
+        # Update immediately
+        self._update_timer_display()
+
+    def _toggle_minimize(self):
+        """Toggle minimized state"""
+        self.minimized = not self.minimized
+
+        # Hide/show middle buttons
+        self.settings_button.setVisible(not self.minimized)
+        self.stats_button.setVisible(not self.minimized)
+        self.notes_button.setVisible(not self.minimized)
+        self.progress_bar.setVisible(not self.minimized)
+        self.mode_button.setVisible(not self.minimized)
+
+        # Adjust width
+        if self.minimized:
+            self.setFixedWidth(60)  # Slimmer when minimized
+        else:
+            self.setFixedWidth(80)
+
+        self._position_sidebar()
+
+    def _update_display(self, elapsed_seconds: int, remaining_seconds: int):
+        """Update timer and progress bar"""
+        self.elapsed_seconds = elapsed_seconds
+        self.remaining_seconds = remaining_seconds
+
+        # Update timer
+        self._update_timer_display()
+
+        # Update progress bar
+        session_info = self.session_manager.get_session_info()
+        if session_info:
+            total_duration = session_info['duration']
+            if total_duration > 0:
+                progress = int((elapsed_seconds / total_duration) * 100)
+                self.progress_bar.setValue(min(100, progress))
+
+    def _update_timer_display(self):
+        """Update the timer label based on mode"""
+        if self.countdown_mode:
+            # Countdown mode - show remaining time
+            seconds = self.remaining_seconds
+        else:
+            # Count-up mode - show elapsed time
+            seconds = self.elapsed_seconds
+
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        secs = seconds % 60
+
+        self.timer_label.setText(f"{hours:02d}:{minutes:02d}:{secs:02d}")
+
+    def _on_app_blocked(self, app_name: str, total_blocked: int):
+        """Handle app blocked event"""
+        # Could show a notification or update stats button
+        pass
+
+    def _request_emergency_exit(self):
+        """Request emergency exit with confirmation"""
+        from PyQt6.QtWidgets import QMessageBox
+        reply = QMessageBox.warning(
+            self,
+            "Emergency Exit",
+            "Are you sure you want to exit this focus session early?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            self.emergency_exit_requested.emit()
+
+    def start_display(self):
+        """Initialize display for session start"""
+        session_info = self.session_manager.get_session_info()
+        self.elapsed_seconds = 0
+        self.remaining_seconds = session_info['duration'] if session_info else 0
+
+        # Initial update
+        self._update_timer_display()
+        self.progress_bar.setValue(0)
+
+        # Show the sidebar
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+
+class QuickStatsPopup(QWidget):
+    """Quick stats popup showing current session statistics"""
+
+    view_full_history_requested = pyqtSignal()
+
+    def __init__(self, session_manager, stats_tracker, parent=None):
+        super().__init__(parent)
+        self.session_manager = session_manager
+        self.stats_tracker = stats_tracker
+        self._setup_ui()
+        self._setup_window_properties()
+
+    def _setup_window_properties(self):
+        """Setup window properties"""
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setFixedWidth(350)
+
+    def _setup_ui(self):
+        """Setup UI"""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # Container with styling
+        container = QWidget()
+        container.setStyleSheet(f"""
+            QWidget {{
+                background-color: {COLORS['bg_secondary']};
+                border: 2px solid {COLORS['accent_primary']};
+                border-radius: 12px;
+            }}
+        """)
+
+        container_layout = QVBoxLayout(container)
+        container_layout.setSpacing(15)
+        container_layout.setContentsMargins(20, 20, 20, 20)
+
+        # Title
+        title = QLabel("📊 Quick Stats")
+        title.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_primary']};
+                font-size: 20px;
+                font-weight: 700;
+                background: transparent;
+            }}
+        """)
+        container_layout.addWidget(title)
+
+        # Stats labels
+        self.elapsed_label = QLabel("Time Elapsed: --:--:--")
+        self.remaining_label = QLabel("Time Remaining: --:--:--")
+        self.blocked_label = QLabel("Apps Blocked: 0")
+        self.completion_label = QLabel("Completion: 0%")
+        self.comparison_label = QLabel("")
+
+        for label in [self.elapsed_label, self.remaining_label, self.blocked_label,
+                     self.completion_label, self.comparison_label]:
+            label.setStyleSheet(f"""
+                QLabel {{
+                    color: {COLORS['text_primary']};
+                    font-size: 14px;
+                    padding: 5px;
+                    background: transparent;
+                }}
+            """)
+            container_layout.addWidget(label)
+
+        # View Full History button
+        history_btn = ModernButton("View Full History", primary=True)
+        history_btn.clicked.connect(self._view_full_history)
+        container_layout.addWidget(history_btn)
+
+        # Close button
+        close_btn = ModernButton("Close")
+        close_btn.clicked.connect(self.hide)
+        container_layout.addWidget(close_btn)
+
+        layout.addWidget(container)
+
+    def show_stats(self):
+        """Update and show stats"""
+        session_info = self.session_manager.get_session_info()
+
+        if session_info:
+            # Time elapsed
+            elapsed = session_info.get('elapsed', 0)
+            hours = elapsed // 3600
+            minutes = (elapsed % 3600) // 60
+            seconds = elapsed % 60
+            self.elapsed_label.setText(f"Time Elapsed: {hours:02d}:{minutes:02d}:{seconds:02d}")
+
+            # Time remaining
+            remaining = session_info.get('remaining', 0)
+            hours = remaining // 3600
+            minutes = (remaining % 3600) // 60
+            seconds = remaining % 60
+            self.remaining_label.setText(f"Time Remaining: {hours:02d}:{minutes:02d}:{seconds:02d}")
+
+            # Apps blocked
+            blocked_count = session_info.get('apps_blocked', 0)
+            self.blocked_label.setText(f"Apps Blocked: {blocked_count}")
+
+            # Completion percentage
+            total_duration = session_info.get('duration', 1)
+            if total_duration > 0:
+                completion = int((elapsed / total_duration) * 100)
+                self.completion_label.setText(f"Completion: {completion}%")
+
+            # Comparison to previous session
+            prev_session = self.stats_tracker.get_previous_session()
+            if prev_session:
+                prev_duration = prev_session.get('time_locked_in_seconds', 0)
+                if prev_duration > 0 and elapsed > prev_duration:
+                    diff = elapsed - prev_duration
+                    diff_mins = diff // 60
+                    self.comparison_label.setText(
+                        f"🔥 {diff_mins} mins longer than last session!"
+                    )
+                    self.comparison_label.setStyleSheet(f"""
+                        QLabel {{
+                            color: {COLORS['accent_primary']};
+                            font-size: 14px;
+                            font-weight: 600;
+                            padding: 5px;
+                            background: transparent;
+                        }}
+                    """)
+                else:
+                    self.comparison_label.setText("")
+
+        # Position near right side of screen
+        from PyQt6.QtWidgets import QApplication
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_geometry = screen.availableGeometry()
+            x = screen_geometry.width() - self.width() - 100
+            y = screen_geometry.height() // 2 - self.height() // 2
+            self.move(x, y)
+
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _view_full_history(self):
+        """Request to view full history"""
+        self.view_full_history_requested.emit()
+        self.hide()
+
+
+class SessionNotesPopup(QWidget):
+    """Session notes popup for taking notes during session"""
+
+    notes_saved = pyqtSignal(str)
+
+    def __init__(self, session_manager, parent=None):
+        super().__init__(parent)
+        self.session_manager = session_manager
+        self._setup_ui()
+        self._setup_window_properties()
+
+    def _setup_window_properties(self):
+        """Setup window properties"""
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setFixedWidth(400)
+        self.setFixedHeight(350)
+
+    def _setup_ui(self):
+        """Setup UI"""
+        from PyQt6.QtWidgets import QTextEdit
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # Container with styling
+        container = QWidget()
+        container.setStyleSheet(f"""
+            QWidget {{
+                background-color: {COLORS['bg_secondary']};
+                border: 2px solid {COLORS['accent_primary']};
+                border-radius: 12px;
+            }}
+        """)
+
+        container_layout = QVBoxLayout(container)
+        container_layout.setSpacing(15)
+        container_layout.setContentsMargins(20, 20, 20, 20)
+
+        # Title
+        title = QLabel("📝 Session Notes")
+        title.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_primary']};
+                font-size: 20px;
+                font-weight: 700;
+                background: transparent;
+            }}
+        """)
+        container_layout.addWidget(title)
+
+        # Instructions
+        instructions = QLabel("What are you working on?")
+        instructions.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_secondary']};
+                font-size: 13px;
+                background: transparent;
+            }}
+        """)
+        container_layout.addWidget(instructions)
+
+        # Text input
+        self.notes_input = QTextEdit()
+        self.notes_input.setPlaceholderText("Type your notes here...")
+        self.notes_input.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {COLORS['bg_tertiary']};
+                color: {COLORS['text_primary']};
+                border: 1px solid {COLORS['border_subtle']};
+                border-radius: 8px;
+                padding: 12px;
+                font-size: 14px;
+                line-height: 1.5;
+            }}
+            QTextEdit:focus {{
+                border: 2px solid {COLORS['accent_primary']};
+            }}
+        """)
+        container_layout.addWidget(self.notes_input)
+
+        # Button layout
+        button_layout = QHBoxLayout()
+
+        # Save button
+        save_btn = ModernButton("Save Notes", primary=True)
+        save_btn.clicked.connect(self._save_notes)
+        button_layout.addWidget(save_btn)
+
+        # Close button
+        close_btn = ModernButton("Close")
+        close_btn.clicked.connect(self.hide)
+        button_layout.addWidget(close_btn)
+
+        container_layout.addLayout(button_layout)
+
+        layout.addWidget(container)
+
+    def show_notes(self):
+        """Show notes popup and load existing notes"""
+        session_info = self.session_manager.get_session_info()
+        if session_info:
+            # Load existing notes if any
+            existing_notes = session_info.get('notes', '')
+            self.notes_input.setPlainText(existing_notes)
+
+        # Position near right side of screen
+        from PyQt6.QtWidgets import QApplication
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_geometry = screen.availableGeometry()
+            x = screen_geometry.width() - self.width() - 100
+            y = screen_geometry.height() // 2 - self.height() // 2
+            self.move(x, y)
+
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        self.notes_input.setFocus()
+
+    def _save_notes(self):
+        """Save notes to session"""
+        notes = self.notes_input.toPlainText()
+
+        # Update session with notes
+        session_info = self.session_manager.get_session_info()
+        if session_info and session_info.get('session_id'):
+            self.session_manager.update_session_notes(notes)
+            self.notes_saved.emit(notes)
+
+            # Show confirmation
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self,
+                "Notes Saved",
+                "Your session notes have been saved!",
+                QMessageBox.StandardButton.Ok
+            )
+
+        self.hide()
 
 
 class MotivationalQuote(QLabel):
