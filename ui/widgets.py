@@ -559,6 +559,298 @@ class TimePickerWidget(QWidget):
         self.minutes_spin.setValue(minutes)
 
 
+class VerticalSidebarLockIn(QWidget):
+    """
+    Vertical sidebar lock-in screen - taskbar style
+    Modern, professional sidebar that docks to the right (or left) side of screen
+    """
+
+    emergency_exit_requested = pyqtSignal()
+
+    def __init__(self, session_manager, parent=None):
+        super().__init__(parent)
+        self.session_manager = session_manager
+        self.countdown_mode = True  # True = countdown, False = count-up
+        self.position_right = True  # True = right side, False = left side
+        self.minimized = False
+
+        self._setup_ui()
+        self._setup_window_properties()
+        self._connect_signals()
+
+    def _setup_window_properties(self):
+        """Setup window to be a floating sidebar"""
+        # Make it a frameless, always-on-top window
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool  # Doesn't show in taskbar
+        )
+
+        # Set fixed width
+        self.setFixedWidth(80)
+
+        # Position on right side of screen
+        self._position_sidebar()
+
+    def _position_sidebar(self):
+        """Position sidebar on right or left side of screen"""
+        from PyQt6.QtWidgets import QApplication
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_geometry = screen.availableGeometry()
+
+            # Full height
+            height = screen_geometry.height()
+            self.setFixedHeight(height)
+
+            if self.position_right:
+                # Right side
+                x = screen_geometry.width() - 80
+            else:
+                # Left side
+                x = 0
+
+            y = 0
+            self.move(x, y)
+
+    def _setup_ui(self):
+        """Setup the sidebar UI"""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Sidebar container
+        self.sidebar_container = QWidget()
+        self.sidebar_container.setStyleSheet(f"""
+            QWidget {{
+                background-color: {COLORS['bg_secondary']};
+                border-left: 1px solid {COLORS['border_subtle']};
+            }}
+        """)
+
+        sidebar_layout = QVBoxLayout(self.sidebar_container)
+        sidebar_layout.setSpacing(20)
+        sidebar_layout.setContentsMargins(10, 20, 10, 20)
+
+        # 1. TIMER DISPLAY (Top)
+        self.timer_label = QLabel("00:00:00")
+        self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.timer_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['accent_primary']};
+                font-size: 20px;
+                font-weight: 700;
+                background: transparent;
+                padding: 10px 5px;
+            }}
+        """)
+        sidebar_layout.addWidget(self.timer_label)
+
+        # Progress bar (vertical)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setOrientation(Qt.Orientation.Vertical)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setFixedHeight(100)
+        self.progress_bar.setStyleSheet(f"""
+            QProgressBar {{
+                border: none;
+                border-radius: 4px;
+                background-color: {COLORS['bg_tertiary']};
+            }}
+            QProgressBar::chunk {{
+                border-radius: 4px;
+                background-color: {COLORS['accent_primary']};
+            }}
+        """)
+        sidebar_layout.addWidget(self.progress_bar)
+
+        # Mode toggle button (countdown/count-up)
+        self.mode_button = QPushButton("⏱")
+        self.mode_button.setFixedSize(40, 40)
+        self.mode_button.setToolTip("Toggle countdown/count-up")
+        self.mode_button.setStyleSheet(self._get_icon_button_style())
+        self.mode_button.clicked.connect(self._toggle_timer_mode)
+        sidebar_layout.addWidget(self.mode_button, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # Spacer
+        sidebar_layout.addSpacing(20)
+
+        # 2. ICON BUTTONS (Middle section)
+
+        # Settings button
+        self.settings_button = QPushButton("⚙")
+        self.settings_button.setFixedSize(40, 40)
+        self.settings_button.setToolTip("Settings")
+        self.settings_button.setStyleSheet(self._get_icon_button_style())
+        sidebar_layout.addWidget(self.settings_button, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # Stats button
+        self.stats_button = QPushButton("📊")
+        self.stats_button.setFixedSize(40, 40)
+        self.stats_button.setToolTip("Quick Stats")
+        self.stats_button.setStyleSheet(self._get_icon_button_style())
+        sidebar_layout.addWidget(self.stats_button, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # Notes button
+        self.notes_button = QPushButton("📝")
+        self.notes_button.setFixedSize(40, 40)
+        self.notes_button.setToolTip("Session Notes")
+        self.notes_button.setStyleSheet(self._get_icon_button_style())
+        sidebar_layout.addWidget(self.notes_button, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # Minimize button
+        self.minimize_button = QPushButton("➖")
+        self.minimize_button.setFixedSize(40, 40)
+        self.minimize_button.setToolTip("Minimize to timer only")
+        self.minimize_button.setStyleSheet(self._get_icon_button_style())
+        self.minimize_button.clicked.connect(self._toggle_minimize)
+        sidebar_layout.addWidget(self.minimize_button, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # Spacer to push exit button to bottom
+        sidebar_layout.addStretch()
+
+        # 3. EMERGENCY EXIT (Bottom)
+        self.exit_button = QPushButton("✕")
+        self.exit_button.setFixedSize(50, 50)
+        self.exit_button.setToolTip("Emergency Exit Session")
+        self.exit_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['danger']};
+                color: {COLORS['text_primary']};
+                border: none;
+                border-radius: 25px;
+                font-size: 24px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['danger_hover']};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS['danger_pressed']};
+            }}
+        """)
+        self.exit_button.clicked.connect(self._request_emergency_exit)
+        sidebar_layout.addWidget(self.exit_button, 0, Qt.AlignmentFlag.AlignCenter)
+
+        layout.addWidget(self.sidebar_container)
+
+    def _get_icon_button_style(self) -> str:
+        """Get stylesheet for icon buttons"""
+        return f"""
+            QPushButton {{
+                background-color: {COLORS['bg_tertiary']};
+                color: {COLORS['text_secondary']};
+                border: 1px solid {COLORS['border_subtle']};
+                border-radius: 20px;
+                font-size: 20px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['accent_primary']};
+                color: {COLORS['text_primary']};
+                border-color: {COLORS['accent_primary']};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS['accent_pressed']};
+            }}
+        """
+
+    def _connect_signals(self):
+        """Connect session manager signals"""
+        self.session_manager.session_updated.connect(self._update_display)
+        self.session_manager.app_blocked.connect(self._on_app_blocked)
+
+    def _toggle_timer_mode(self):
+        """Toggle between countdown and count-up modes"""
+        self.countdown_mode = not self.countdown_mode
+        # Update immediately
+        self._update_timer_display()
+
+    def _toggle_minimize(self):
+        """Toggle minimized state"""
+        self.minimized = not self.minimized
+
+        # Hide/show middle buttons
+        self.settings_button.setVisible(not self.minimized)
+        self.stats_button.setVisible(not self.minimized)
+        self.notes_button.setVisible(not self.minimized)
+        self.progress_bar.setVisible(not self.minimized)
+        self.mode_button.setVisible(not self.minimized)
+
+        # Adjust width
+        if self.minimized:
+            self.setFixedWidth(60)  # Slimmer when minimized
+        else:
+            self.setFixedWidth(80)
+
+        self._position_sidebar()
+
+    def _update_display(self, elapsed_seconds: int, remaining_seconds: int):
+        """Update timer and progress bar"""
+        self.elapsed_seconds = elapsed_seconds
+        self.remaining_seconds = remaining_seconds
+
+        # Update timer
+        self._update_timer_display()
+
+        # Update progress bar
+        session_info = self.session_manager.get_session_info()
+        if session_info:
+            total_duration = session_info['duration']
+            if total_duration > 0:
+                progress = int((elapsed_seconds / total_duration) * 100)
+                self.progress_bar.setValue(min(100, progress))
+
+    def _update_timer_display(self):
+        """Update the timer label based on mode"""
+        if self.countdown_mode:
+            # Countdown mode - show remaining time
+            seconds = self.remaining_seconds
+        else:
+            # Count-up mode - show elapsed time
+            seconds = self.elapsed_seconds
+
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        secs = seconds % 60
+
+        self.timer_label.setText(f"{hours:02d}:{minutes:02d}:{secs:02d}")
+
+    def _on_app_blocked(self, app_name: str, total_blocked: int):
+        """Handle app blocked event"""
+        # Could show a notification or update stats button
+        pass
+
+    def _request_emergency_exit(self):
+        """Request emergency exit with confirmation"""
+        from PyQt6.QtWidgets import QMessageBox
+        reply = QMessageBox.warning(
+            self,
+            "Emergency Exit",
+            "Are you sure you want to exit this focus session early?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            self.emergency_exit_requested.emit()
+
+    def start_display(self):
+        """Initialize display for session start"""
+        session_info = self.session_manager.get_session_info()
+        self.elapsed_seconds = 0
+        self.remaining_seconds = session_info['duration'] if session_info else 0
+
+        # Initial update
+        self._update_timer_display()
+        self.progress_bar.setValue(0)
+
+        # Show the sidebar
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+
 class MotivationalQuote(QLabel):
     """Premium motivational quote widget"""
 
