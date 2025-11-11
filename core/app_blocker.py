@@ -434,6 +434,27 @@ class AppBlocker(QObject):
         if 'updat' in name_lower or 'download' in name_lower:
             return True
 
+        # Filter Windows Store apps with package names
+        # These have patterns like: "SpotifyAB.SpotifyMusic_1.275.5.100_x64__zpdnekdrzrea0"
+        # Check for multiple underscores (version numbers and package IDs)
+        if name_lower.count('_') >= 2:
+            return True
+
+        # Filter if contains version pattern (numbers with dots followed by underscores)
+        import re
+        if re.search(r'\d+\.\d+\.\d+.*_', name_lower):
+            return True
+
+        # Filter Windows Store package patterns
+        if '__' in name_lower:  # Double underscore indicates package ID
+            return True
+
+        # Filter if name contains both dots and underscores (typical Store app pattern)
+        if '.' in name_lower and '_' in name_lower:
+            # Allow some common apps like discord.exe_helper, but filter store packages
+            if re.search(r'\w+\.\w+_\d', name_lower):  # Company.App_Version pattern
+                return True
+
         return False
 
     def _get_friendly_app_name(self, process_name: str, exe_path: str) -> str:
