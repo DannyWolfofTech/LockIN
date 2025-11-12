@@ -216,7 +216,7 @@ class AppListWidget(QWidget):
         layout.addWidget(self.list_widget)
 
         # Remove button
-        self.remove_btn = ModernButton("− Remove Selected")
+        self.remove_btn = ModernButton("➖ Remove Selected")
         self.remove_btn.clicked.connect(self._remove_selected)
         layout.addWidget(self.remove_btn)
 

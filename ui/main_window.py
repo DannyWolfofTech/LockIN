@@ -148,7 +148,7 @@ class SessionSetupScreen(QWidget):
         # Add spacing before button to prevent overlap
         running_layout.addSpacing(15)
 
-        add_btn = ModernButton("+ Add to Whitelist", primary=False)
+        add_btn = ModernButton("➕ Add to Whitelist", primary=False)
         add_btn.clicked.connect(self._add_to_whitelist)
         running_layout.addWidget(add_btn, 0)  # Don't stretch the button
 
@@ -575,24 +575,25 @@ class MainWindow(QMainWindow):
         """Setup main window UI"""
         self.setWindowTitle("Lock In - Focus & Productivity")
 
-        # Size window to fit on screen with reasonable margins (80% of screen)
+        # Fixed window size to prevent extending beyond screen
+        max_width = 1200  # Fixed maximum width
+        max_height = 750  # Fixed maximum height
+
         screen = QApplication.primaryScreen()
         if screen:
             screen_geometry = screen.availableGeometry()
-            width = int(screen_geometry.width() * 0.8)
-            height = int(screen_geometry.height() * 0.8)
 
-            # Center the window with proper margins on all sides
-            x = screen_geometry.x() + (screen_geometry.width() - width) // 2
-            y = screen_geometry.y() + (screen_geometry.height() - height) // 2
+            # Use fixed size, centered on screen
+            x = screen_geometry.x() + (screen_geometry.width() - max_width) // 2
+            y = screen_geometry.y() + (screen_geometry.height() - max_height) // 2
 
-            self.setGeometry(x, y, width, height)
+            self.setGeometry(x, y, max_width, max_height)
         else:
             # Fallback if screen detection fails
-            self.setMinimumSize(1000, 700)
-            self.resize(1200, 800)
+            self.setMinimumSize(max_width, max_height)
+            self.resize(max_width, max_height)
 
-        # Apply dark theme
+        # Apply light theme (modern, clean design)
         self.setStyleSheet(f"""
             QMainWindow {{
                 background-color: {COLORS['bg_primary']};

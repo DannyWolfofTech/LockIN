@@ -434,26 +434,49 @@ class AppBlocker(QObject):
         if 'updat' in name_lower or 'download' in name_lower:
             return True
 
-        # Filter Windows Store apps with package names
-        # These have patterns like: "SpotifyAB.SpotifyMusic_1.275.5.100_x64__zpdnekdrzrea0"
-        # Check for multiple underscores (version numbers and package IDs)
+        # ULTRA AGGRESSIVE FILTERING - Filter out all garbage
+        import re
+
+        # Filter if name starts with a number (version numbers like "142.0.3595.53")
+        if name_lower and name_lower[0].isdigit():
+            return True
+
+        # Filter if name is too long (Windows Store packages are often 50+ chars)
+        if len(name_lower) > 50:
+            return True
+
+        # Filter version patterns - anything with dots and numbers like "2.2543.1.0"
+        # This catches: "142.0.3595.53", "25.199.1012.0002_1", etc.
+        if re.search(r'\d+\.\d+\.\d+', name_lower):
+            return True
+
+        # Filter anything with 2 or more underscores (version numbers and package IDs)
         if name_lower.count('_') >= 2:
             return True
 
-        # Filter if contains version pattern (numbers with dots followed by underscores)
-        import re
-        if re.search(r'\d+\.\d+\.\d+.*_', name_lower):
+        # Filter double underscore patterns (Windows Store package IDs)
+        if '__' in name_lower:
             return True
 
-        # Filter Windows Store package patterns
-        if '__' in name_lower:  # Double underscore indicates package ID
+        # Filter architecture patterns
+        if 'x64' in name_lower or 'x86' in name_lower or 'arm64' in name_lower:
             return True
 
-        # Filter if name contains both dots and underscores (typical Store app pattern)
+        # Filter Windows Store package patterns like "_cv1g1gvanyjgm" (random hash IDs)
+        # These are lowercase letters and numbers after underscore
+        if re.search(r'_[a-z0-9]{8,}', name_lower):
+            return True
+
+        # Filter Company.App_Version patterns
         if '.' in name_lower and '_' in name_lower:
-            # Allow some common apps like discord.exe_helper, but filter store packages
-            if re.search(r'\w+\.\w+_\d', name_lower):  # Company.App_Version pattern
+            # Check for Company.AppName_version pattern
+            if re.search(r'\w+\.\w+_', name_lower):
                 return True
+
+        # Filter pure version numbers or build numbers
+        # Like "25.199.1012.0002" or similar
+        if re.match(r'^[\d.]+$', name_lower):
+            return True
 
         return False
 
