@@ -575,12 +575,18 @@ class MainWindow(QMainWindow):
         """Setup main window UI"""
         self.setWindowTitle("Lock In - Focus & Productivity")
 
-        # Make window 90% of screen size (fullscreen-ish)
+       # Fixed window size to fit properly on screen
         screen = QApplication.primaryScreen()
         if screen:
             screen_geometry = screen.availableGeometry()
-            width = int(screen_geometry.width() * 0.9)
-            height = int(screen_geometry.height() * 0.9)
+            
+            # Maximum dimensions
+            max_width = 1200
+            max_height = 750
+            
+            # Use max size but don't exceed screen
+            width = min(max_width, screen_geometry.width() - 100)
+            height = min(max_height, screen_geometry.height() - 100)
 
             # Center the window
             x = (screen_geometry.width() - width) // 2
