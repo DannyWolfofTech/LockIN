@@ -148,7 +148,7 @@ class SessionSetupScreen(QWidget):
         # Add spacing before button to prevent overlap
         running_layout.addSpacing(15)
 
-        add_btn = ModernButton("Add to Whitelist →", primary=False)
+        add_btn = ModernButton("➕ Add to Whitelist", primary=False)
         add_btn.clicked.connect(self._add_to_whitelist)
         running_layout.addWidget(add_btn, 0)  # Don't stretch the button
 
