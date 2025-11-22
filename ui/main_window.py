@@ -573,7 +573,7 @@ class MainWindow(QMainWindow):
 
     def _setup_ui(self):
         """Setup main window UI"""
-        self.setWindowTitle("Lock In - Focus & Productivity")
+        self.setWindowTitle("LockIN - Focus & Productivity")
 
        # Fixed window size to fit properly on screen
         screen = QApplication.primaryScreen()
