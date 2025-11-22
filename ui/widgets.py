@@ -32,6 +32,9 @@ COLORS = {
     'border_subtle': '#e5e7eb',   # Light subtle borders (was dark)
 }
 
+# Modern font family (system fonts for best compatibility)
+FONT_FAMILY = "Segoe UI, -apple-system, BlinkMacSystemFont, sans-serif"
+
 
 class ModernCard(QFrame):
     """Base card widget with clean, minimal design - no green borders"""
@@ -41,7 +44,7 @@ class ModernCard(QFrame):
         self._setup_style()
 
     def _setup_style(self):
-        """Setup modern card styling - SIMPLIFIED, no green borders"""
+        """Setup modern card styling with light mode support"""
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet(f"""
             QFrame {{
@@ -51,11 +54,11 @@ class ModernCard(QFrame):
             }}
         """)
 
-        # Add subtle shadow effect for depth
+        # Add subtle shadow effect for depth (optimized for light mode)
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(15)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 2)
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 25))  # Lighter shadow for light mode
+        shadow.setOffset(0, 4)
         self.setGraphicsEffect(shadow)
 
 
@@ -580,10 +583,9 @@ class VerticalSidebarLockIn(QWidget):
 
     def _setup_window_properties(self):
         """Setup window to be a floating sidebar"""
-        # Make it a frameless, always-on-top window
+        # Make it a frameless window (removed always-on-top so it doesn't block other windows)
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.WindowStaysOnTopHint |
             Qt.WindowType.Tool  # Doesn't show in taskbar
         )
 
@@ -639,19 +641,33 @@ class VerticalSidebarLockIn(QWidget):
         self.timer_label.setStyleSheet(f"""
             QLabel {{
                 color: {COLORS['accent_primary']};
-                font-size: 20px;
+                font-size: 14px;
                 font-weight: 700;
                 background: transparent;
-                padding: 10px 5px;
+                padding: 8px 2px;
             }}
         """)
         sidebar_layout.addWidget(self.timer_label)
+
+        # Mode indicator label (shows current mode)
+        self.mode_indicator = QLabel("⏬")  # Down arrow for countdown
+        self.mode_indicator.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.mode_indicator.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text_secondary']};
+                font-size: 12px;
+                background: transparent;
+                padding: 0px;
+            }}
+        """)
+        self.mode_indicator.setToolTip("Currently counting down")
+        sidebar_layout.addWidget(self.mode_indicator)
 
         # Progress bar (vertical)
         self.progress_bar = QProgressBar()
         self.progress_bar.setOrientation(Qt.Orientation.Vertical)
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setFixedHeight(100)
+        self.progress_bar.setFixedHeight(80)
         self.progress_bar.setStyleSheet(f"""
             QProgressBar {{
                 border: none;
@@ -668,7 +684,7 @@ class VerticalSidebarLockIn(QWidget):
         # Mode toggle button (countdown/count-up)
         self.mode_button = QPushButton("⏱")
         self.mode_button.setFixedSize(40, 40)
-        self.mode_button.setToolTip("Toggle countdown/count-up")
+        self.mode_button.setToolTip("Click to toggle: Count Down ⏬ / Count Up ⏫")
         self.mode_button.setStyleSheet(self._get_icon_button_style())
         self.mode_button.clicked.connect(self._toggle_timer_mode)
         sidebar_layout.addWidget(self.mode_button, 0, Qt.AlignmentFlag.AlignCenter)
@@ -678,11 +694,12 @@ class VerticalSidebarLockIn(QWidget):
 
         # 2. ICON BUTTONS (Middle section)
 
-        # Settings button
+        # Settings button (hidden for now - not functional)
         self.settings_button = QPushButton("⚙")
         self.settings_button.setFixedSize(40, 40)
         self.settings_button.setToolTip("Settings")
         self.settings_button.setStyleSheet(self._get_icon_button_style())
+        self.settings_button.hide()  # Hide non-functional button
         sidebar_layout.addWidget(self.settings_button, 0, Qt.AlignmentFlag.AlignCenter)
 
         # Stats button
@@ -763,27 +780,51 @@ class VerticalSidebarLockIn(QWidget):
     def _toggle_timer_mode(self):
         """Toggle between countdown and count-up modes"""
         self.countdown_mode = not self.countdown_mode
-        # Update immediately
+
+        # Update mode indicator visual
+        if self.countdown_mode:
+            self.mode_indicator.setText("⏬")  # Down arrow
+            self.mode_indicator.setToolTip("Currently counting down")
+        else:
+            self.mode_indicator.setText("⏫")  # Up arrow
+            self.mode_indicator.setToolTip("Currently counting up")
+
+        # Update timer immediately
         self._update_timer_display()
 
     def _toggle_minimize(self):
-        """Toggle minimized state"""
+        """Toggle minimized state - keep timer visible"""
         self.minimized = not self.minimized
 
-        # Hide/show middle buttons
+        # Hide/show elements (but keep timer and mode indicator visible)
         self.settings_button.setVisible(not self.minimized)
         self.stats_button.setVisible(not self.minimized)
         self.notes_button.setVisible(not self.minimized)
         self.progress_bar.setVisible(not self.minimized)
         self.mode_button.setVisible(not self.minimized)
+        self.mode_indicator.setVisible(not self.minimized)  # Hide in minimized mode
 
-        # Adjust width
+        # Adjust width and keep right edge aligned
         if self.minimized:
-            self.setFixedWidth(60)  # Slimmer when minimized
+            new_width = 70  # Wider minimal mode to fit timer properly
         else:
-            self.setFixedWidth(80)
+            new_width = 80
 
-        self._position_sidebar()
+        # Get current position before resize
+        from PyQt6.QtWidgets import QApplication
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_geometry = screen.availableGeometry()
+
+            # Always stick to right edge
+            if self.position_right:
+                x = screen_geometry.width() - new_width
+            else:
+                x = 0
+
+            # Update width and position
+            self.setFixedWidth(new_width)
+            self.move(x, self.y())  # Keep same Y, update X to stay at edge
 
     def _update_display(self, elapsed_seconds: int, remaining_seconds: int):
         """Update timer and progress bar"""

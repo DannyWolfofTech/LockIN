@@ -575,16 +575,12 @@ class MainWindow(QMainWindow):
         """Setup main window UI"""
         self.setWindowTitle("LockIN - Focus & Productivity")
 
-       # Fixed window size to fit properly on screen
+        # Make window 90% of screen size (fullscreen-ish)
         screen = QApplication.primaryScreen()
         if screen:
             screen_geometry = screen.availableGeometry()
-            
-            # Maximum dimensions
             max_width = 1200
             max_height = 750
-            
-            # Use max size but don't exceed screen
             width = min(max_width, screen_geometry.width() - 100)
             height = min(max_height, screen_geometry.height() - 100)
 
@@ -592,13 +588,13 @@ class MainWindow(QMainWindow):
             x = (screen_geometry.width() - width) // 2
             y = (screen_geometry.height() - height) // 2
 
-            self.setGeometry(x, y, width, height)
+            self.setGeometry(x, y, max_width, max_height)
         else:
             # Fallback if screen detection fails
-            self.setMinimumSize(1100, 750)
-            self.resize(1400, 900)
+            self.setMinimumSize(max_width, max_height)
+            self.resize(max_width, max_height)
 
-        # Apply dark theme
+        # Apply light theme (modern, clean design)
         self.setStyleSheet(f"""
             QMainWindow {{
                 background-color: {COLORS['bg_primary']};
@@ -696,16 +692,27 @@ class MainWindow(QMainWindow):
 
     def _new_session(self):
         """Start a new session"""
+        # Reset session manager to IDLE state (critical fix for session restart)
+        self.session_manager.reset()
+
+        # Reset the form
         self.setup_screen.reset_form()
         self.stack.setCurrentWidget(self.setup_screen)
 
         # Hide sidebar if visible
         self.sidebar.hide()
 
+        # Hide popups if visible
+        self.stats_popup.hide()
+        self.notes_popup.hide()
+
         # Restore main window
         self.setWindowState(Qt.WindowState.WindowNoState)
         self.showNormal()
         self.activateWindow()
+
+        # Re-enable close
+        self.allow_close = True
 
     def _on_session_started(self, session_id: int):
         """Handle session started"""
