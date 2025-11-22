@@ -13,23 +13,23 @@ from PyQt6.QtGui import QFont, QPalette, QColor, QIcon, QPixmap
 from typing import List, Dict
 import sys
 
-# Modern Light Mode Color Scheme
+# Modern Premium Color Scheme - LIGHT MODE
 COLORS = {
     'bg_primary': '#ffffff',      # Clean white background
-    'bg_secondary': '#f8f9fa',    # Light gray for cards/elevated surfaces
-    'bg_tertiary': '#f1f3f5',     # Slightly darker for input fields
-    'accent_primary': '#10b981',  # Emerald green accent (kept from original)
+    'bg_secondary': '#f8f9fa',    # Light gray card/elevated background
+    'bg_tertiary': '#f3f4f6',     # Slightly darker for input fields
+    'accent_primary': '#10b981',  # Emerald green accent (keep this!)
     'accent_hover': '#059669',    # Darker green on hover
     'accent_pressed': '#047857',  # Even darker green when pressed
     'danger': '#ef4444',          # Red for danger/exit
     'danger_hover': '#dc2626',
     'danger_pressed': '#b91c1c',
-    'text_primary': '#1a1a1a',    # Dark text for primary content
-    'text_secondary': '#6b7280',  # Medium gray for secondary text
-    'text_muted': '#9ca3af',      # Light gray for muted text
-    'border': '#10b981',          # Emerald green borders (for accent)
-    'border_focus': '#10b981',    # Emerald green for focused borders
-    'border_subtle': '#e5e7eb',   # Very light gray for subtle borders
+    'text_primary': '#1a1a1a',    # Dark text (was white)
+    'text_secondary': '#4b5563',  # Dark gray text (was light gray)
+    'text_muted': '#6b7280',      # Muted dark gray (was light)
+    'border': '#10b981',          # Emerald green borders (keep)
+    'border_focus': '#10b981',    # Emerald green for focused borders (keep)
+    'border_subtle': '#e5e7eb',   # Light subtle borders (was dark)
 }
 
 # Modern font family (system fonts for best compatibility)

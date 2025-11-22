@@ -7,6 +7,7 @@ import psutil
 import time
 import sys
 import os
+import re
 from typing import List, Set, Callable, Optional, Dict
 from pathlib import Path
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
@@ -379,6 +380,7 @@ class AppBlocker(QObject):
             self.whitelisted_processes.discard(pid)
 
     def _is_system_process(self, name: str, exe_path: str) -> bool:
+        
         """
         Check if a process is a system process that should be hidden from the user
 
@@ -479,6 +481,34 @@ class AppBlocker(QObject):
             return True
 
         return False
+    def _should_filter_app(self, name: str) -> bool:
+        """Filter out garbage app names (version numbers, package IDs, etc.)"""
+        if not name:
+            return True
+        
+        name_lower = name.lower()
+        
+        # Filter if starts with number (e.g., "142.0.3595.53")
+        if name_lower[0].isdigit():
+            return True
+        
+        # Filter version patterns (e.g., "25.199.1012.0002_1")
+        if re.search(r'\d+\.\d+\.\d+', name_lower):
+            return True
+        
+        # Filter Windows Store apps (2+ underscores)
+        if name.count('_') >= 2:
+            return True
+        
+        # Filter package IDs (contains _x64_ or _x86_)
+        if '_x64_' in name_lower or '_x86_' in name_lower:
+            return True
+        
+        # Filter very long names (likely package IDs)
+        if len(name) > 50:
+            return True
+        
+        return False
 
     def _get_friendly_app_name(self, process_name: str, exe_path: str) -> str:
         """
@@ -565,6 +595,10 @@ class AppBlocker(QObject):
 
                     # Skip system processes
                     if self._is_system_process(name, exe_path):
+                        continue
+
+                    # Skip garbage app names
+                    if self._should_filter_app(name):
                         continue
 
                     seen.add(name.lower())
