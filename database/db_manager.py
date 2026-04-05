@@ -51,6 +51,10 @@ class DatabaseManager:
 
         except sqlite3.Error as e:
             print(f"Database initialization error: {e}")
+            # Close connection on error to prevent resource leak
+            if self.connection:
+                self.connection.close()
+                self.connection = None
             raise
 
     def _run_migrations(self) -> None:
