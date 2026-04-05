@@ -147,11 +147,11 @@ class AppBlocker(QObject):
         'samsungmagician', 'intelrapidstoragetechnology',
     }
 
-    # Pre-compiled regex patterns for performance (used in process filtering)
-    _RE_VERSION = re.compile(r'\d+\.\d+\.\d+')
-    _RE_HASH_ID = re.compile(r'_[a-z0-9]{8,}')
-    _RE_COMPANY_APP = re.compile(r'\w+\.\w+_')
-    _RE_PURE_VERSION = re.compile(r'^[\d.]+$')
+    # Pre-compiled regex patterns for performance (used in _is_system_process filtering)
+    _RE_VERSION = re.compile(r'\d+\.\d+\.\d+')       # Matches version strings like "1.2.3"
+    _RE_HASH_ID = re.compile(r'_[a-z0-9]{8,}')       # Matches Windows Store package hash IDs like "_cv1g1gvanyjgm"
+    _RE_COMPANY_APP = re.compile(r'\w+\.\w+_')        # Matches Company.AppName_version patterns
+    _RE_PURE_VERSION = re.compile(r'^[\d.]+$')         # Matches pure version/build numbers like "25.199.1012.0002"
 
     # System paths to exclude (processes in these folders are usually system processes)
     SYSTEM_PATHS = [

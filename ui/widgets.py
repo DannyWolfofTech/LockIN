@@ -30,6 +30,7 @@ COLORS = {
     'border': '#10b981',          # Emerald green borders (keep)
     'border_focus': '#10b981',    # Emerald green for focused borders (keep)
     'border_subtle': '#e5e7eb',   # Light subtle borders (was dark)
+    'text_on_accent': '#ffffff',   # White text for use on colored backgrounds (buttons, badges)
 }
 
 # Modern font family (system fonts for best compatibility)
@@ -77,7 +78,7 @@ class ModernButton(QPushButton):
             self.setStyleSheet(f"""
                 QPushButton {{
                     background-color: {COLORS['accent_primary']};
-                    color: #ffffff;
+                    color: {COLORS['text_on_accent']};
                     border: none;
                     border-radius: 8px;
                     padding: 14px 28px;
@@ -99,7 +100,7 @@ class ModernButton(QPushButton):
             self.setStyleSheet(f"""
                 QPushButton {{
                     background-color: {COLORS['danger']};
-                    color: #ffffff;
+                    color: {COLORS['text_on_accent']};
                     border: none;
                     border-radius: 8px;
                     padding: 14px 28px;
@@ -734,7 +735,7 @@ class VerticalSidebarLockIn(QWidget):
         self.exit_button.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLORS['danger']};
-                color: #ffffff;
+                color: {COLORS['text_on_accent']};
                 border: none;
                 border-radius: 25px;
                 font-size: 24px;
