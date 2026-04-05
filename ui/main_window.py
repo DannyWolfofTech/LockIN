@@ -576,11 +576,12 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("LockIN - Focus & Productivity")
 
         # Make window 90% of screen size (fullscreen-ish)
+        max_width = 1200
+        max_height = 750
+
         screen = QApplication.primaryScreen()
         if screen:
             screen_geometry = screen.availableGeometry()
-            max_width = 1200
-            max_height = 750
             width = min(max_width, screen_geometry.width() - 100)
             height = min(max_height, screen_geometry.height() - 100)
 

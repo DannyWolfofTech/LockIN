@@ -147,6 +147,12 @@ class AppBlocker(QObject):
         'samsungmagician', 'intelrapidstoragetechnology',
     }
 
+    # Pre-compiled regex patterns for performance (used in process filtering)
+    _RE_VERSION = re.compile(r'\d+\.\d+\.\d+')
+    _RE_HASH_ID = re.compile(r'_[a-z0-9]{8,}')
+    _RE_COMPANY_APP = re.compile(r'\w+\.\w+_')
+    _RE_PURE_VERSION = re.compile(r'^[\d.]+$')
+
     # System paths to exclude (processes in these folders are usually system processes)
     SYSTEM_PATHS = [
         'c:\\windows\\system32',
@@ -380,7 +386,6 @@ class AppBlocker(QObject):
             self.whitelisted_processes.discard(pid)
 
     def _is_system_process(self, name: str, exe_path: str) -> bool:
-        
         """
         Check if a process is a system process that should be hidden from the user
 
@@ -437,8 +442,6 @@ class AppBlocker(QObject):
             return True
 
         # ULTRA AGGRESSIVE FILTERING - Filter out all garbage
-        import re
-
         # Filter if name starts with a number (version numbers like "142.0.3595.53")
         if name_lower and name_lower[0].isdigit():
             return True
@@ -449,7 +452,7 @@ class AppBlocker(QObject):
 
         # Filter version patterns - anything with dots and numbers like "2.2543.1.0"
         # This catches: "142.0.3595.53", "25.199.1012.0002_1", etc.
-        if re.search(r'\d+\.\d+\.\d+', name_lower):
+        if self._RE_VERSION.search(name_lower):
             return True
 
         # Filter anything with 2 or more underscores (version numbers and package IDs)
@@ -466,48 +469,20 @@ class AppBlocker(QObject):
 
         # Filter Windows Store package patterns like "_cv1g1gvanyjgm" (random hash IDs)
         # These are lowercase letters and numbers after underscore
-        if re.search(r'_[a-z0-9]{8,}', name_lower):
+        if self._RE_HASH_ID.search(name_lower):
             return True
 
         # Filter Company.App_Version patterns
         if '.' in name_lower and '_' in name_lower:
             # Check for Company.AppName_version pattern
-            if re.search(r'\w+\.\w+_', name_lower):
+            if self._RE_COMPANY_APP.search(name_lower):
                 return True
 
         # Filter pure version numbers or build numbers
         # Like "25.199.1012.0002" or similar
-        if re.match(r'^[\d.]+$', name_lower):
+        if self._RE_PURE_VERSION.match(name_lower):
             return True
 
-        return False
-    def _should_filter_app(self, name: str) -> bool:
-        """Filter out garbage app names (version numbers, package IDs, etc.)"""
-        if not name:
-            return True
-        
-        name_lower = name.lower()
-        
-        # Filter if starts with number (e.g., "142.0.3595.53")
-        if name_lower[0].isdigit():
-            return True
-        
-        # Filter version patterns (e.g., "25.199.1012.0002_1")
-        if re.search(r'\d+\.\d+\.\d+', name_lower):
-            return True
-        
-        # Filter Windows Store apps (2+ underscores)
-        if name.count('_') >= 2:
-            return True
-        
-        # Filter package IDs (contains _x64_ or _x86_)
-        if '_x64_' in name_lower or '_x86_' in name_lower:
-            return True
-        
-        # Filter very long names (likely package IDs)
-        if len(name) > 50:
-            return True
-        
         return False
 
     def _get_friendly_app_name(self, process_name: str, exe_path: str) -> str:
@@ -595,10 +570,6 @@ class AppBlocker(QObject):
 
                     # Skip system processes
                     if self._is_system_process(name, exe_path):
-                        continue
-
-                    # Skip garbage app names
-                    if self._should_filter_app(name):
                         continue
 
                     seen.add(name.lower())
@@ -728,7 +699,7 @@ class AppBlocker(QObject):
                                             'path': exec_path or '',
                                             'icon': icon
                                         }
-                            except:
+                            except (OSError, ValueError):
                                 continue
 
                 # For macOS, look for .app bundles

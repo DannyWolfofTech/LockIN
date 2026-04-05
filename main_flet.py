@@ -24,7 +24,7 @@ def main(page: ft.Page):
 
     # Page configuration
     page.title = "Lock In - Focus & Productivity"
-    page.theme_mode = ft.ThemeMode.DARK
+    page.theme_mode = ft.ThemeMode.LIGHT
     page.window_width = 1100
     page.window_height = 750
     page.window_min_width = 900
@@ -128,7 +128,7 @@ def main(page: ft.Page):
 
         if not filtered:
             available_list.controls.append(
-                ft.Text("No apps found", color=ft.colors.WHITE70, text_align=ft.TextAlign.CENTER)
+                ft.Text("No apps found", color=ft.colors.BLACK45, text_align=ft.TextAlign.CENTER)
             )
         else:
             for app in filtered:
@@ -139,7 +139,7 @@ def main(page: ft.Page):
                             leading=ft.Icon("apps", color="#10b981"),
                             title=ft.Text(
                                 app['display_name'],
-                                color="#10b981" if is_running else ft.colors.WHITE
+                                color="#10b981" if is_running else ft.colors.BLACK87
                             ),
                             trailing=ft.IconButton(
                                 icon="add_circle_outline",
@@ -147,9 +147,9 @@ def main(page: ft.Page):
                                 on_click=lambda _, a=app: add_to_whitelist(a)
                             ),
                         ),
-                        border=ft.border.all(1, "#404040"),
+                        border=ft.border.all(1, "#e5e7eb"),
                         border_radius=8,
-                        bgcolor="#2a2a2a",
+                        bgcolor="#f8f9fa",
                     )
                 )
         page.update()
@@ -160,7 +160,7 @@ def main(page: ft.Page):
 
         if not whitelisted_apps:
             whitelisted_list.controls.append(
-                ft.Text("No apps whitelisted", color=ft.colors.WHITE70, text_align=ft.TextAlign.CENTER)
+                ft.Text("No apps whitelisted", color=ft.colors.BLACK45, text_align=ft.TextAlign.CENTER)
             )
         else:
             for app in whitelisted_apps:
@@ -177,7 +177,7 @@ def main(page: ft.Page):
                         ),
                         border=ft.border.all(1, "#10b981"),
                         border_radius=8,
-                        bgcolor="#2a2a2a",
+                        bgcolor="#f8f9fa",
                     )
                 )
         page.update()
@@ -276,7 +276,7 @@ def main(page: ft.Page):
             # Start session
             success = session_manager.start_session()
             if success:
-                current_session_id = session_manager.current_session_id
+                current_session_id = session_manager.session_id
                 page.go("/lock-in")
             else:
                 page.show_snack_bar(
@@ -354,7 +354,7 @@ def main(page: ft.Page):
                                                         height=400,
                                                         border=ft.border.all(1, "#10b981"),
                                                         border_radius=12,
-                                                        bgcolor="#1a1a1a",
+                                                        bgcolor="#ffffff",
                                                     ),
                                                 ],
                                                 expand=3,
@@ -369,7 +369,7 @@ def main(page: ft.Page):
                                                         height=400,
                                                         border=ft.border.all(1, "#10b981"),
                                                         border_radius=12,
-                                                        bgcolor="#1a1a1a",
+                                                        bgcolor="#ffffff",
                                                     ),
                                                 ],
                                                 expand=2,
@@ -391,15 +391,15 @@ def main(page: ft.Page):
                             ft.ElevatedButton(
                                 "Refresh Apps",
                                 icon="refresh",
-                                bgcolor="#3a3a3a",
-                                color=ft.colors.WHITE,
+                                bgcolor="#f3f4f6",
+                                color="#1a1a1a",
                                 on_click=refresh_apps_click
                             ),
                             ft.ElevatedButton(
                                 "Start Session",
                                 icon="play_arrow",
                                 bgcolor="#10b981",
-                                color=ft.colors.WHITE,
+                                color="#ffffff",
                                 on_click=start_session_click
                             ),
                         ],
@@ -439,7 +439,7 @@ def main(page: ft.Page):
                                     content=ft.Container(
                                         content=ft.Column(
                                             [
-                                                ft.Text("SESSION PROGRESS", color=ft.colors.WHITE70, size=12),
+                                                ft.Text("SESSION PROGRESS", color="#4b5563", size=12),
                                                 ft.ProgressBar(value=0, color="#10b981", height=20),
                                                 ft.Text("0%", size=32, weight=ft.FontWeight.BOLD),
                                             ],
@@ -456,7 +456,7 @@ def main(page: ft.Page):
                                             content=ft.Container(
                                                 content=ft.Column(
                                                     [
-                                                        ft.Text("TIME ELAPSED", color=ft.colors.WHITE70, size=12),
+                                                        ft.Text("TIME ELAPSED", color="#4b5563", size=12),
                                                         ft.Text("00:00", size=36, weight=ft.FontWeight.BOLD),
                                                     ],
                                                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -469,7 +469,7 @@ def main(page: ft.Page):
                                             content=ft.Container(
                                                 content=ft.Column(
                                                     [
-                                                        ft.Text("TIME REMAINING", color=ft.colors.WHITE70, size=12),
+                                                        ft.Text("TIME REMAINING", color="#4b5563", size=12),
                                                         ft.Text(f"{session_info['duration']//60:02d}:{session_info['duration']%60:02d}", size=36, weight=ft.FontWeight.BOLD),
                                                     ],
                                                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -482,7 +482,7 @@ def main(page: ft.Page):
                                             content=ft.Container(
                                                 content=ft.Column(
                                                     [
-                                                        ft.Text("APPS BLOCKED", color=ft.colors.WHITE70, size=12),
+                                                        ft.Text("APPS BLOCKED", color="#4b5563", size=12),
                                                         ft.Text("0", size=36, weight=ft.FontWeight.BOLD),
                                                     ],
                                                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -495,12 +495,12 @@ def main(page: ft.Page):
                                     alignment=ft.MainAxisAlignment.CENTER,
                                     spacing=15,
                                 ),
-                                ft.Text("Stay focused. You've got this! 💪", size=18, color=ft.colors.WHITE70, italic=True),
+                                ft.Text("Stay focused. You've got this! 💪", size=18, color="#6b7280", italic=True),
                                 ft.ElevatedButton(
                                     "Emergency Exit",
                                     icon="exit_to_app",
                                     bgcolor="#ef4444",
-                                    color=ft.colors.WHITE,
+                                    color="#ffffff",
                                     on_click=emergency_exit_click
                                 ),
                             ],
@@ -551,14 +551,14 @@ def main(page: ft.Page):
                         content=ft.Column(
                             [
                                 ft.Text("Session Complete!", size=36, weight=ft.FontWeight.BOLD, color="#10b981"),
-                                ft.Text(session['name'], size=20, color=ft.colors.WHITE70),
+                                ft.Text(session['name'], size=20, color="#4b5563"),
                                 ft.Row(
                                     [
                                         ft.Card(
                                             content=ft.Container(
                                                 content=ft.Column(
                                                     [
-                                                        ft.Text("TIME LOCKED IN", color=ft.colors.WHITE70, size=12),
+                                                        ft.Text("TIME LOCKED IN", color="#4b5563", size=12),
                                                         ft.Text(session['time_locked_in_formatted'], size=42, weight=ft.FontWeight.BOLD, color="#10b981"),
                                                     ],
                                                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -572,7 +572,7 @@ def main(page: ft.Page):
                                             content=ft.Container(
                                                 content=ft.Column(
                                                     [
-                                                        ft.Text("PLANNED DURATION", color=ft.colors.WHITE70, size=12),
+                                                        ft.Text("PLANNED DURATION", color="#4b5563", size=12),
                                                         ft.Text(session['duration_formatted'], size=42, weight=ft.FontWeight.BOLD),
                                                     ],
                                                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -592,7 +592,7 @@ def main(page: ft.Page):
                                             content=ft.Container(
                                                 content=ft.Column(
                                                     [
-                                                        ft.Text("APPS BLOCKED", color=ft.colors.WHITE70, size=12),
+                                                        ft.Text("APPS BLOCKED", color="#4b5563", size=12),
                                                         ft.Text(str(session['apps_blocked_count']), size=42, weight=ft.FontWeight.BOLD),
                                                     ],
                                                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -606,7 +606,7 @@ def main(page: ft.Page):
                                             content=ft.Container(
                                                 content=ft.Column(
                                                     [
-                                                        ft.Text("COMPLETION", color=ft.colors.WHITE70, size=12),
+                                                        ft.Text("COMPLETION", color="#4b5563", size=12),
                                                         ft.Text(f"{session['completion_percentage']:.0f}%", size=42, weight=ft.FontWeight.BOLD, color="#10b981"),
                                                     ],
                                                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -622,7 +622,7 @@ def main(page: ft.Page):
                                 ),
                                 ft.Card(
                                     content=ft.Container(
-                                        content=ft.Text(comp_text, size=15, text_align=ft.TextAlign.CENTER, color=ft.colors.WHITE70),
+                                        content=ft.Text(comp_text, size=15, text_align=ft.TextAlign.CENTER, color="#4b5563"),
                                         width=500,
                                         padding=25,
                                     ),
@@ -631,7 +631,7 @@ def main(page: ft.Page):
                                     "Start New Session",
                                     icon="refresh",
                                     bgcolor="#10b981",
-                                    color=ft.colors.WHITE,
+                                    color="#ffffff",
                                     on_click=lambda _: page.go("/")
                                 ),
                             ],

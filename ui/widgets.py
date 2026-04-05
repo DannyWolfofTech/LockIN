@@ -77,7 +77,7 @@ class ModernButton(QPushButton):
             self.setStyleSheet(f"""
                 QPushButton {{
                     background-color: {COLORS['accent_primary']};
-                    color: {COLORS['text_primary']};
+                    color: #ffffff;
                     border: none;
                     border-radius: 8px;
                     padding: 14px 28px;
@@ -99,7 +99,7 @@ class ModernButton(QPushButton):
             self.setStyleSheet(f"""
                 QPushButton {{
                     background-color: {COLORS['danger']};
-                    color: {COLORS['text_primary']};
+                    color: #ffffff;
                     border: none;
                     border-radius: 8px;
                     padding: 14px 28px;
@@ -641,7 +641,7 @@ class VerticalSidebarLockIn(QWidget):
         self.timer_label.setStyleSheet(f"""
             QLabel {{
                 color: {COLORS['accent_primary']};
-                font-size: 14px;
+                font-size: 18px;
                 font-weight: 700;
                 background: transparent;
                 padding: 8px 2px;
@@ -734,7 +734,7 @@ class VerticalSidebarLockIn(QWidget):
         self.exit_button.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLORS['danger']};
-                color: {COLORS['text_primary']};
+                color: #ffffff;
                 border: none;
                 border-radius: 25px;
                 font-size: 24px;
@@ -1233,7 +1233,7 @@ class MotivationalQuote(QLabel):
         """Start quote rotation timer"""
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._next_quote)
-        self.timer.start(30000)
+        self.timer.start(15000)
 
     def _next_quote(self):
         """Show next quote"""
