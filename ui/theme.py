@@ -258,6 +258,23 @@ QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
     background: {c['accent']};
 }}
 
+QCheckBox {{
+    spacing: 10px;
+    font-size: 13px;
+    color: {c['text2']};
+}}
+QCheckBox::indicator {{
+    width: 18px; height: 18px;
+    border: 1px solid {c['border']};
+    border-radius: 5px;
+    background: {c['surface']};
+}}
+QCheckBox::indicator:hover {{ border-color: {c['accent']}; }}
+QCheckBox::indicator:checked {{
+    background: {c['accent']};
+    border-color: {c['accent']};
+}}
+
 /* ---------- lists ---------- */
 QListWidget {{
     background-color: {c['surface']};

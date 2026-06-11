@@ -270,6 +270,7 @@ class FocusPill(QWidget):
         self.session_manager = session_manager
         self.countdown = True
         self.collapsed = False
+        self.strict = False
         self.elapsed = 0
         self.remaining = 0
         self._drag_offset = None
@@ -329,8 +330,9 @@ class FocusPill(QWidget):
 
     # ---- behaviour
 
-    def start_display(self):
+    def start_display(self, strict: bool = False):
         info = self.session_manager.get_session_info()
+        self.strict = strict
         self.elapsed = 0
         self.remaining = info["duration"] if info else 0
         self.countdown = True
@@ -381,7 +383,20 @@ class FocusPill(QWidget):
             self.COLLAPSED_W if self.collapsed else self.EXPANDED_W, self.HEIGHT
         )
 
+    STRICT_PHRASE = "END SESSION"
+
     def _confirm_exit(self):
+        if getattr(self, "strict", False):
+            from PyQt6.QtWidgets import QInputDialog
+            text, ok = QInputDialog.getText(
+                self, "Strict mode",
+                f"You chose strict mode.\n"
+                f"Type  {self.STRICT_PHRASE}  to end the session early:",
+            )
+            if ok and text.strip().upper() == self.STRICT_PHRASE:
+                self.exit_requested.emit()
+            return
+
         reply = QMessageBox.warning(
             self, "End session",
             "End this focus session early?",

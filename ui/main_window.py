@@ -17,7 +17,7 @@ from datetime import datetime
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QStackedWidget, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QScrollArea, QMessageBox, QApplication, QButtonGroup,
+    QScrollArea, QMessageBox, QApplication, QButtonGroup, QCheckBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QCloseEvent, QColor
@@ -37,7 +37,7 @@ from database.db_manager import DatabaseManager
 class FocusSetupScreen(QWidget):
     """Name it, time it, pick what's allowed, lock in."""
 
-    start_session_requested = pyqtSignal(str, int, list)
+    start_session_requested = pyqtSignal(str, int, list, bool)  # +strict
 
     def __init__(self, session_manager: SessionManager, parent=None):
         super().__init__(parent)
@@ -66,6 +66,11 @@ class FocusSetupScreen(QWidget):
         config.body.addWidget(self.name_input)
         self.duration = DurationPicker()
         config.body.addWidget(self.duration)
+        self.strict_check = QCheckBox(
+            "Strict mode — ending early requires typing a confirmation"
+        )
+        self.strict_check.setCursor(Qt.CursorShape.PointingHandCursor)
+        config.body.addWidget(self.strict_check)
         layout.addWidget(config)
 
         # --- app picker
@@ -183,12 +188,15 @@ class FocusSetupScreen(QWidget):
             )
             if reply == QMessageBox.StandardButton.No:
                 return
-        self.start_session_requested.emit(name, minutes, apps)
+        self.start_session_requested.emit(
+            name, minutes, apps, self.strict_check.isChecked()
+        )
 
     def reset_form(self):
         self.name_input.clear()
         self.duration.reset()
         self.allowed.clear()
+        self.strict_check.setChecked(False)
         self.refresh_apps()
 
 
@@ -579,7 +587,8 @@ class MainWindow(QMainWindow):
 
     # ---- session lifecycle
 
-    def _start_session(self, name: str, minutes: int, apps: list):
+    def _start_session(self, name: str, minutes: int, apps: list,
+                       strict: bool = False):
         if self.session_manager.current_state != SessionState.IDLE:
             self.session_manager.reset()
         if not self.session_manager.setup_session(name, minutes, apps):
@@ -590,7 +599,7 @@ class MainWindow(QMainWindow):
             self.session_manager.reset()
             return
         self.allow_close = False
-        self.pill.start_display()
+        self.pill.start_display(strict=strict)
         self.showMinimized()
 
     def _emergency_exit(self):
