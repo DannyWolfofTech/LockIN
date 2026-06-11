@@ -1,23 +1,12 @@
 # Lock In - Focus/Productivity Desktop Application
 # Python 3.11+ required
 
-# GUI Frameworks
-# PyQt6 - For main.py (desktop-native UI)
+# GUI
 PyQt6>=6.6.0
 PyQt6-Qt6>=6.6.0
 
-# Flet - For main_flet.py (Material Design UI, alternative)
-flet>=0.21.0
-
-# Process Management
+# Process management
 psutil>=5.9.0
 
-# Database (SQLite is built-in, but we may need these for advanced features)
-# Additional utilities
-python-dateutil>=2.8.2
-
-# For charts/graphs in stats dashboard (optional, can be added later)
-matplotlib>=3.8.0
-
-# Windows-specific (optional, for better icon extraction on Windows)
+# Windows-specific (optional, for app icon extraction)
 pywin32>=306; platform_system == "Windows"
