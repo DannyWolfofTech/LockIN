@@ -6,13 +6,17 @@ Widgets here only declare structure + the objectName / property
 hooks the theme targets.
 """
 
+from datetime import date, timedelta
+
 from PyQt6.QtWidgets import (
     QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout, QFrame,
     QSpinBox, QProgressBar, QTextEdit, QGraphicsDropShadowEffect,
-    QApplication, QMessageBox,
+    QApplication, QMessageBox, QToolTip,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QRect
+from PyQt6.QtGui import QColor, QPainter
+
+from ui.theme import palette
 
 
 # ---------------------------------------------------------------- factories
@@ -159,6 +163,90 @@ class DurationPicker(QWidget):
 
     def reset(self):
         self._pick_preset(50, self.chips[1])
+
+
+# ---------------------------------------------------------------- heatmap
+
+class FocusHeatmap(QWidget):
+    """GitHub-style contribution graph for daily focus time.
+
+    Pure QPainter - no chart library. Column = week, row = weekday,
+    newest week on the right. Hover a cell for date + focus time.
+    """
+
+    CELL = 13
+    GAP = 3
+
+    # bucket upper bounds in seconds -> accent alpha
+    BUCKETS = [(0, 0), (30 * 60, 70), (60 * 60, 120),
+               (120 * 60, 185), (float("inf"), 255)]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._data = {}          # 'YYYY-MM-DD' -> seconds
+        self._cells = []         # (QRect, date, seconds) for tooltips
+        self.setMouseTracking(True)
+        self.setMinimumHeight(7 * (self.CELL + self.GAP) + 8)
+
+    def set_data(self, daily_seconds: dict):
+        self._data = dict(daily_seconds)
+        self.update()
+
+    def _alpha(self, seconds: int) -> int:
+        for bound, alpha in self.BUCKETS:
+            if seconds <= bound:
+                return alpha
+        return 255
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        colors = palette()
+        empty = QColor(colors["surface2"])
+        accent = QColor(colors["accent"])
+
+        step = self.CELL + self.GAP
+        weeks = max(1, min(53, self.width() // step))
+        today = date.today()
+        # grid starts on the Monday of the oldest visible week
+        grid_start = today - timedelta(days=today.weekday() + 7 * (weeks - 1))
+
+        self._cells = []
+        for col in range(weeks):
+            for row in range(7):
+                day = grid_start + timedelta(days=col * 7 + row)
+                if day > today:
+                    continue
+                secs = self._data.get(day.isoformat(), 0)
+                alpha = self._alpha(secs)
+                if alpha:
+                    color = QColor(accent)
+                    color.setAlpha(alpha)
+                else:
+                    color = empty
+                rect = QRect(col * step, row * step, self.CELL, self.CELL)
+                painter.setBrush(color)
+                painter.drawRoundedRect(rect, 3, 3)
+                self._cells.append((rect, day, secs))
+        painter.end()
+
+    def mouseMoveEvent(self, event):
+        pos = event.position().toPoint()
+        for rect, day, secs in self._cells:
+            if rect.contains(pos):
+                if secs >= 3600:
+                    spent = f"{secs // 3600}h {secs % 3600 // 60}m"
+                elif secs > 0:
+                    spent = f"{secs // 60}m"
+                else:
+                    spent = "no focus"
+                QToolTip.showText(
+                    event.globalPosition().toPoint(),
+                    f"{day.strftime('%b %d')} — {spent}", self,
+                )
+                return
+        QToolTip.hideText()
 
 
 # ---------------------------------------------------------------- focus pill

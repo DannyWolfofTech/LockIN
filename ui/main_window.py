@@ -25,7 +25,7 @@ from PyQt6.QtGui import QCloseEvent, QColor
 from ui.theme import apply_theme, palette, mode
 from ui.widgets import (
     button, label, Card, StatTile, DurationPicker,
-    FocusPill, StatsPopover, NotesPopover,
+    FocusPill, StatsPopover, NotesPopover, FocusHeatmap,
 )
 from core.session_manager import SessionManager, SessionState
 from core.stats_tracker import StatsTracker
@@ -290,6 +290,12 @@ class StatsScreen(QWidget):
         tiles.addWidget(self.best_streak_tile, 0, 3)
         layout.addLayout(tiles)
 
+        heatmap_card = Card(padding=20, spacing=10)
+        heatmap_card.body.addWidget(label("LAST 12 MONTHS", "statLabel"))
+        self.heatmap = FocusHeatmap()
+        heatmap_card.body.addWidget(self.heatmap)
+        layout.addWidget(heatmap_card)
+
         row = QHBoxLayout()
         row.setSpacing(14)
 
@@ -313,6 +319,11 @@ class StatsScreen(QWidget):
         layout.addLayout(row, 1)
 
     def refresh(self):
+        daily = self.stats_tracker.get_daily_breakdown(days=365)
+        self.heatmap.set_data(
+            {d["date"]: d["total_time_seconds"] for d in daily}
+        )
+
         totals = self.stats_tracker.get_total_stats()
         self.total_tile.set_value(totals.get("total_time_formatted", "0h 0m"))
         self.sessions_tile.set_value(str(totals.get("total_sessions") or 0))
