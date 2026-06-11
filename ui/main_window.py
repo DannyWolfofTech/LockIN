@@ -12,6 +12,7 @@ takes over. A theme toggle (light/dark) lives at the bottom of the
 rail and persists via the settings table.
 """
 
+import json
 from datetime import datetime
 
 from PyQt6.QtWidgets import (
@@ -56,6 +57,13 @@ class FocusSetupScreen(QWidget):
         layout.addWidget(label(
             "Everything not on your list gets closed and stays closed.", "sub"
         ))
+
+        # --- saved templates (hidden until one exists)
+        self.templates_bar = QWidget()
+        self.templates_layout = QHBoxLayout(self.templates_bar)
+        self.templates_layout.setContentsMargins(0, 0, 0, 0)
+        self.templates_layout.setSpacing(8)
+        layout.addWidget(self.templates_bar)
 
         # --- session config
         config = Card(padding=24, spacing=14)
@@ -118,11 +126,17 @@ class FocusSetupScreen(QWidget):
         refresh = button("Refresh apps", "ghost")
         refresh.clicked.connect(self.refresh_apps)
         actions.addWidget(refresh)
+        save_tpl = button("Save as template", "ghost",
+                          "Save this name + duration + app list for one-click reuse")
+        save_tpl.clicked.connect(self._save_template)
+        actions.addWidget(save_tpl)
         actions.addStretch()
         start = button("Start focus session", "primary")
         start.clicked.connect(self._start)
         actions.addWidget(start)
         layout.addLayout(actions)
+
+        self._reload_templates()
 
     # ---- app list
 
@@ -170,6 +184,77 @@ class FocusSetupScreen(QWidget):
 
     def _whitelist(self) -> list:
         return [self.allowed.item(i).text() for i in range(self.allowed.count())]
+
+    # ---- templates
+
+    MAX_TEMPLATES = 6
+
+    def _read_templates(self) -> list:
+        raw = self.session_manager.db_manager.get_setting("templates", "[]")
+        try:
+            templates = json.loads(raw)
+            return templates if isinstance(templates, list) else []
+        except (ValueError, TypeError):
+            return []
+
+    def _write_templates(self, templates: list):
+        self.session_manager.db_manager.set_setting(
+            "templates", json.dumps(templates[: self.MAX_TEMPLATES])
+        )
+        self._reload_templates()
+
+    def _reload_templates(self):
+        while self.templates_layout.count():
+            item = self.templates_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        templates = self._read_templates()
+        self.templates_bar.setVisible(bool(templates))
+        if not templates:
+            return
+        self.templates_layout.addWidget(label("Templates", "hint"))
+        for tpl in templates:
+            chip = button(tpl.get("name", "?"), "chip",
+                          "Click to load · right-click to delete")
+            chip.clicked.connect(lambda _, t=tpl: self._apply_template(t))
+            chip.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            chip.customContextMenuRequested.connect(
+                lambda _, t=tpl: self._delete_template(t))
+            self.templates_layout.addWidget(chip)
+        self.templates_layout.addStretch()
+
+    def _apply_template(self, tpl: dict):
+        self.name_input.setText(tpl.get("name", ""))
+        self.duration.set_minutes(int(tpl.get("minutes", 50)))
+        self.strict_check.setChecked(bool(tpl.get("strict", False)))
+        self.allowed.clear()
+        for app in tpl.get("apps", []):
+            self.allowed.addItem(app)
+
+    def _save_template(self):
+        from PyQt6.QtWidgets import QInputDialog
+        default = self.name_input.text().strip() or "My setup"
+        name, ok = QInputDialog.getText(
+            self, "Save template", "Template name:", text=default)
+        name = (name or "").strip()
+        if not ok or not name:
+            return
+        tpl = {
+            "name": name,
+            "minutes": self.duration.get_total_minutes(),
+            "apps": self._whitelist(),
+            "strict": self.strict_check.isChecked(),
+        }
+        templates = [t for t in self._read_templates()
+                     if t.get("name") != name]
+        templates.insert(0, tpl)
+        self._write_templates(templates)
+
+    def _delete_template(self, tpl: dict):
+        templates = [t for t in self._read_templates()
+                     if t.get("name") != tpl.get("name")]
+        self._write_templates(templates)
 
     # ---- start
 

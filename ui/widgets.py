@@ -161,6 +161,14 @@ class DurationPicker(QWidget):
             return self.hours.value() * 60 + self.minutes.value()
         return self._minutes
 
+    def set_minutes(self, minutes: int):
+        for (_, preset), chip in zip(self.PRESETS, self.chips):
+            if preset == minutes:
+                self._pick_preset(minutes, chip)
+                return
+        self._minutes = minutes
+        self._pick_custom()
+
     def reset(self):
         self._pick_preset(50, self.chips[1])
 
