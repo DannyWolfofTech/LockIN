@@ -62,6 +62,7 @@ class SessionManager(QObject):
         self.session_start_time: Optional[float] = None
         self.whitelisted_apps: List[str] = []
         self.apps_blocked_count: int = 0
+        self.session_notes: str = ""  # cached; mirrored to DB on save
 
         # Timer for session updates
         self.session_timer = QTimer(self)
@@ -94,6 +95,7 @@ class SessionManager(QObject):
             self.session_duration = duration_minutes * 60  # Convert to seconds
             self.whitelisted_apps = whitelisted_apps
             self.apps_blocked_count = 0
+            self.session_notes = ""
 
             # Create session in database
             self.session_id = self.db_manager.create_session(
@@ -258,16 +260,6 @@ class SessionManager(QObject):
         Returns:
             Dictionary with session info
         """
-        # Get notes from database if session exists
-        notes = ""
-        if self.session_id:
-            try:
-                session_data = self.db_manager.get_session(self.session_id)
-                if session_data:
-                    notes = session_data.get('notes', '')
-            except Exception as e:
-                print(f"Error getting session notes: {e}")
-
         return {
             'session_id': self.session_id,
             'name': self.session_name,
@@ -278,7 +270,7 @@ class SessionManager(QObject):
             'progress': self.get_progress_percentage(),
             'apps_blocked': self.apps_blocked_count,
             'whitelisted_apps': self.whitelisted_apps.copy(),
-            'notes': notes
+            'notes': self.session_notes
         }
 
     def update_session_notes(self, notes: str) -> bool:
@@ -297,6 +289,7 @@ class SessionManager(QObject):
                     session_id=self.session_id,
                     notes=notes
                 )
+                self.session_notes = notes
                 return True
             return False
         except Exception as e:
@@ -317,6 +310,7 @@ class SessionManager(QObject):
         self.session_start_time = None
         self.whitelisted_apps.clear()
         self.apps_blocked_count = 0
+        self.session_notes = ""
 
         self._change_state(SessionState.IDLE)
 

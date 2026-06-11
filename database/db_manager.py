@@ -206,7 +206,7 @@ class DatabaseManager:
             cursor = self.connection.cursor()
             cursor.execute("""
                 SELECT * FROM sessions
-                ORDER BY created_at DESC
+                ORDER BY created_at DESC, id DESC
                 LIMIT ?
             """, (limit,))
 
@@ -361,7 +361,7 @@ class DatabaseManager:
                     apps_blocked_count, emergency_exit_used, created_at
                 FROM sessions
                 WHERE created_at >= datetime('now', '-' || ? || ' days')
-                ORDER BY created_at DESC
+                ORDER BY created_at DESC, id DESC
             """, (days,))
 
             return [dict(row) for row in cursor.fetchall()]
