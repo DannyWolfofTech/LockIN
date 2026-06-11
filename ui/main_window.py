@@ -1,762 +1,618 @@
 """
-Main Window - Lock In Application
-Contains all UI screens and manages navigation
+Main window for Lock In.
+
+Layout: left navigation rail + stacked screens.
+
+    Focus    - set up and start a session
+    History  - past sessions with notes
+    Stats    - lifetime totals, streaks, most-blocked apps
+
+During a session the window minimizes and the floating FocusPill
+takes over. A theme toggle (light/dark) lives at the bottom of the
+rail and persists via the settings table.
 """
 
-from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QStackedWidget, QLabel, QLineEdit, QMessageBox,
-    QListWidget, QListWidgetItem, QScrollArea, QGridLayout,
-    QDialog, QDialogButtonBox, QSizeGrip, QApplication
-)
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize
-from PyQt6.QtGui import QFont, QCloseEvent, QColor, QScreen
+from datetime import datetime
 
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
+    QStackedWidget, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QScrollArea, QMessageBox, QApplication, QButtonGroup,
+)
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QCloseEvent, QColor
+
+from ui.theme import apply_theme, palette, mode
 from ui.widgets import (
-    ModernButton, TimerDisplay, AppListWidget,
-    SessionInfoCard, ProgressCard, TimePickerWidget,
-    MotivationalQuote, ModernCard, VerticalSidebarLockIn,
-    QuickStatsPopup, SessionNotesPopup, COLORS
+    button, label, Card, StatTile, DurationPicker,
+    FocusPill, StatsPopover, NotesPopover,
 )
 from core.session_manager import SessionManager, SessionState
 from core.stats_tracker import StatsTracker
 from database.db_manager import DatabaseManager
 
 
-class SessionSetupScreen(QWidget):
-    """Screen for setting up a new focus session"""
+# ================================================================ screens
 
-    start_session_requested = pyqtSignal(str, int, list)  # name, duration_mins, apps
+class FocusSetupScreen(QWidget):
+    """Name it, time it, pick what's allowed, lock in."""
+
+    start_session_requested = pyqtSignal(str, int, list)
 
     def __init__(self, session_manager: SessionManager, parent=None):
         super().__init__(parent)
+        self.setObjectName("Screen")
         self.session_manager = session_manager
-        self.selected_apps = []
-        self.all_apps = []  # Store all apps for filtering
-        self._setup_ui()
+        self.all_apps = []
+        self._build_ui()
+        self.refresh_apps()
 
-    def _setup_ui(self):
-        """Setup UI components"""
+    def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setSpacing(20)
-        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setContentsMargins(36, 32, 36, 28)
+        layout.setSpacing(18)
 
-        # Title
-        title = QLabel("Lock In - Start a Focus Session")
-        title.setFont(QFont("Segoe UI", 32, QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
-
-        # Session name
-        name_label = QLabel("Session Name:")
-        name_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 14px; font-weight: 600;")
-        layout.addWidget(name_label)
-
-        self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("e.g., Deep Work Session, Study Time, etc.")
-        self.name_input.setStyleSheet(f"""
-            QLineEdit {{
-                background-color: {COLORS['bg_tertiary']};
-                color: {COLORS['text_primary']};
-                border: 2px solid {COLORS['border']};
-                border-radius: 6px;
-                padding: 12px;
-                font-size: 14px;
-            }}
-            QLineEdit:focus {{
-                border-color: {COLORS['border_focus']};
-            }}
-        """)
-        layout.addWidget(self.name_input)
-
-        # Duration picker
-        duration_label = QLabel("Session Duration:")
-        duration_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 14px; font-weight: 600;")
-        layout.addWidget(duration_label)
-
-        self.time_picker = TimePickerWidget()
-        layout.addWidget(self.time_picker)
-
-        # App selection with PREMIUM CARD DESIGN
-        apps_label = QLabel("Select Apps to Whitelist:")
-        apps_label.setStyleSheet(f"color: {COLORS['text_primary']}; font-size: 16px; font-weight: 700; margin-top: 12px;")
-        layout.addWidget(apps_label)
-
-        # Running apps list and whitelist side by side - BIGGER LAYOUT
-        apps_layout = QHBoxLayout()
-        apps_layout.setSpacing(20)
-
-        # Running apps column - Takes 60% of space
-        running_layout = QVBoxLayout()
-        running_layout.setSpacing(12)
-
-        running_title = QLabel("Available Apps")
-        running_title.setStyleSheet(f"color: {COLORS['text_primary']}; font-size: 15px; font-weight: 700; background: transparent;")
-        running_layout.addWidget(running_title)
-
-        # Search box with MODERN DESIGN
-        self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("🔍 Search apps...")
-        self.search_box.setMinimumHeight(40)
-        self.search_box.setStyleSheet(f"""
-            QLineEdit {{
-                background-color: {COLORS['bg_secondary']};
-                color: {COLORS['text_primary']};
-                border: 1px solid {COLORS['border']};
-                border-radius: 8px;
-                padding: 10px 14px;
-                font-size: 14px;
-            }}
-            QLineEdit:focus {{
-                border: 2px solid {COLORS['accent_primary']};
-            }}
-        """)
-        self.search_box.textChanged.connect(self._filter_apps)
-        running_layout.addWidget(self.search_box)
-
-        # Available apps list - PREMIUM CARD DESIGN - INCREASED HEIGHT
-        self.running_apps_list = QListWidget()
-        self.running_apps_list.setMinimumHeight(550)  # EVEN BIGGER to prevent overlap
-        self.running_apps_list.setStyleSheet(f"""
-            QListWidget {{
-                background-color: {COLORS['bg_secondary']};
-                border: 1px solid {COLORS['border']};
-                border-radius: 12px;
-                color: {COLORS['text_primary']};
-                padding: 12px;
-                font-size: 14px;
-            }}
-            QListWidget::item {{
-                padding: 14px;
-                border-radius: 8px;
-                margin: 4px 0;
-                min-height: 40px;
-            }}
-            QListWidget::item:hover {{
-                background-color: {COLORS['bg_tertiary']};
-                border-left: 4px solid {COLORS['accent_primary']};
-            }}
-            QListWidget::item:selected {{
-                background-color: {COLORS['accent_primary']};
-                color: {COLORS['text_primary']};
-            }}
-        """)
-        self.running_apps_list.setIconSize(QSize(28, 28))
-        running_layout.addWidget(self.running_apps_list, 1)  # Give it stretch factor
-
-        # Add spacing before button to prevent overlap
-        running_layout.addSpacing(15)
-
-        add_btn = ModernButton("➕ Add to Whitelist", primary=False)
-        add_btn.clicked.connect(self._add_to_whitelist)
-        running_layout.addWidget(add_btn, 0)  # Don't stretch the button
-
-        apps_layout.addLayout(running_layout, 60)  # 60% of space
-
-        # Whitelisted apps column - Takes 40% of space
-        self.whitelist_widget = AppListWidget()
-        self.whitelist_widget.app_removed.connect(self._on_app_removed)
-        self.whitelist_widget.list_widget.setIconSize(QSize(28, 28))
-        self.whitelist_widget.list_widget.setMinimumHeight(550)  # Match available apps height
-        apps_layout.addWidget(self.whitelist_widget, 40)  # 40% of space
-
-        layout.addLayout(apps_layout)
-
-        # Buttons
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-
-        refresh_btn = ModernButton("Refresh Apps")
-        refresh_btn.clicked.connect(self._refresh_running_apps)
-        button_layout.addWidget(refresh_btn)
-
-        self.start_btn = ModernButton("Start Session", primary=True)
-        self.start_btn.clicked.connect(self._start_session)
-        button_layout.addWidget(self.start_btn)
-
-        layout.addLayout(button_layout)
-
-        # Initial load of running apps
-        self._refresh_running_apps()
-
-    def _filter_apps(self, search_text: str):
-        """Filter apps based on search text"""
-        search_lower = search_text.lower()
-        self.running_apps_list.clear()
-
-        for app in self.all_apps:
-            if search_lower in app['display_name'].lower():
-                item = QListWidgetItem(app['display_name'])
-                item.setData(Qt.ItemDataRole.UserRole, app)
-                if app.get('icon'):
-                    item.setIcon(app['icon'])
-                self.running_apps_list.addItem(item)
-
-    def _refresh_running_apps(self):
-        """Refresh list of ALL available applications (running + installed) - RUNNING APPS FIRST"""
-        self.running_apps_list.clear()
-        self.all_apps.clear()
-
-        # Get ALL installed applications + currently running apps
-        all_installed = self.session_manager.app_blocker.get_all_installed_apps()
-        running_apps = self.session_manager.app_blocker.get_running_apps()
-
-        # Create a set of running app names for quick lookup
-        running_names = {app['display_name'] for app in running_apps}
-
-        # Sort: running apps first (priority 0), then installed apps (priority 1)
-        # Within each group, sort alphabetically by display name
-        all_apps = sorted(all_installed, key=lambda x: (
-            0 if x['display_name'] in running_names else 1,
-            x['display_name'].lower()
+        layout.addWidget(label("Lock in.", "display"))
+        layout.addWidget(label(
+            "Everything not on your list gets closed and stays closed.", "sub"
         ))
 
-        self.all_apps = all_apps
+        # --- session config
+        config = Card(padding=24, spacing=14)
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText(
+            "What are you working on?  e.g. Thesis draft"
+        )
+        config.body.addWidget(self.name_input)
+        self.duration = DurationPicker()
+        config.body.addWidget(self.duration)
+        layout.addWidget(config)
 
-        for app in all_apps:
-            is_running = app['display_name'] in running_names
+        # --- app picker
+        picker = Card(padding=24, spacing=12)
+        picker.body.addWidget(label("Allowed apps", "h2"))
 
-            # Add visual indicator for running apps
-            display_text = f"● {app['display_name']}" if is_running else app['display_name']
+        lists = QHBoxLayout()
+        lists.setSpacing(16)
 
-            item = QListWidgetItem(display_text)
-            item.setData(Qt.ItemDataRole.UserRole, app)
+        left = QVBoxLayout()
+        left.setSpacing(8)
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Search apps…")
+        self.search.textChanged.connect(self._filter)
+        left.addWidget(self.search)
+        self.available = QListWidget()
+        self.available.itemDoubleClicked.connect(lambda _: self._add())
+        left.addWidget(self.available, 1)
+        lists.addLayout(left, 3)
 
-            # Add icon if available
-            if app.get('icon'):
-                item.setIcon(app['icon'])
+        middle = QVBoxLayout()
+        middle.addStretch()
+        add_btn = button("Add →", "ghost", "Allow the selected app")
+        add_btn.clicked.connect(self._add)
+        remove_btn = button("← Remove", "ghost", "Disallow the selected app")
+        remove_btn.clicked.connect(self._remove)
+        middle.addWidget(add_btn)
+        middle.addWidget(remove_btn)
+        middle.addStretch()
+        lists.addLayout(middle, 0)
 
-            # Style running apps differently
-            if is_running:
-                item.setForeground(QColor(COLORS['accent_primary']))
+        right = QVBoxLayout()
+        right.setSpacing(8)
+        right.addWidget(label("Allowed during the session", "sub"))
+        self.allowed = QListWidget()
+        self.allowed.itemDoubleClicked.connect(lambda _: self._remove())
+        right.addWidget(self.allowed, 1)
+        lists.addLayout(right, 2)
 
-            self.running_apps_list.addItem(item)
+        picker.body.addLayout(lists, 1)
+        layout.addWidget(picker, 1)
 
-    def _add_to_whitelist(self):
-        """Add selected app to whitelist"""
-        current_item = self.running_apps_list.currentItem()
-        if current_item:
-            app_data = current_item.data(Qt.ItemDataRole.UserRole)
-            self.whitelist_widget.add_app(
-                app_data['display_name'],
-                app_data['path'],
-                app_data.get('icon')
-            )
+        # --- actions
+        actions = QHBoxLayout()
+        refresh = button("Refresh apps", "ghost")
+        refresh.clicked.connect(self.refresh_apps)
+        actions.addWidget(refresh)
+        actions.addStretch()
+        start = button("Start focus session", "primary")
+        start.clicked.connect(self._start)
+        actions.addWidget(start)
+        layout.addLayout(actions)
 
-    def _on_app_removed(self, app_name: str):
-        """Handle app removed from whitelist"""
-        pass  # Could refresh UI if needed
+    # ---- app list
 
-    def _start_session(self):
-        """Start the session"""
-        session_name = self.name_input.text().strip()
-        if not session_name:
-            QMessageBox.warning(self, "Invalid Input", "Please enter a session name.")
+    def refresh_apps(self):
+        blocker = self.session_manager.app_blocker
+        installed = blocker.get_all_installed_apps()
+        running = {a["display_name"] for a in blocker.get_running_apps()}
+        self.all_apps = sorted(
+            installed,
+            key=lambda a: (a["display_name"] not in running,
+                           a["display_name"].lower()),
+        )
+        for app in self.all_apps:
+            app["running"] = app["display_name"] in running
+        self._filter(self.search.text())
+
+    def _filter(self, text: str):
+        text = text.lower()
+        self.available.clear()
+        for app in self.all_apps:
+            name = app["display_name"]
+            if text and text not in name.lower():
+                continue
+            item = QListWidgetItem(("●  " if app["running"] else "") + name)
+            item.setData(Qt.ItemDataRole.UserRole, name)
+            if app.get("icon"):
+                item.setIcon(app["icon"])
+            if app["running"]:
+                item.setForeground(QColor(palette()["accent"]))
+            self.available.addItem(item)
+
+    def _add(self):
+        item = self.available.currentItem()
+        if not item:
             return
+        name = item.data(Qt.ItemDataRole.UserRole)
+        existing = [self.allowed.item(i).text() for i in range(self.allowed.count())]
+        if name not in existing:
+            self.allowed.addItem(name)
 
-        duration_mins = self.time_picker.get_total_minutes()
-        if duration_mins <= 0:
-            QMessageBox.warning(self, "Invalid Duration", "Please set a duration greater than 0 minutes.")
+    def _remove(self):
+        row = self.allowed.currentRow()
+        if row >= 0:
+            self.allowed.takeItem(row)
+
+    def _whitelist(self) -> list:
+        return [self.allowed.item(i).text() for i in range(self.allowed.count())]
+
+    # ---- start
+
+    def _start(self):
+        name = self.name_input.text().strip() or "Focus session"
+        minutes = self.duration.get_total_minutes()
+        if minutes <= 0:
+            QMessageBox.warning(self, "Duration", "Set a duration first.")
             return
-
-        whitelisted_apps = self.whitelist_widget.get_apps()
-        if not whitelisted_apps:
+        apps = self._whitelist()
+        if not apps:
             reply = QMessageBox.question(
-                self, "No Whitelisted Apps",
-                "You haven't whitelisted any apps. This will block ALL applications. Continue?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                self, "Nothing allowed",
+                "No apps are allowed - everything will be blocked.\nLock in anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.No:
                 return
-
-        self.start_session_requested.emit(session_name, duration_mins, whitelisted_apps)
+        self.start_session_requested.emit(name, minutes, apps)
 
     def reset_form(self):
-        """Reset form to default state"""
         self.name_input.clear()
-        self.time_picker.set_time(1, 30)
-        self.whitelist_widget.clear_apps()
-        self._refresh_running_apps()
+        self.duration.reset()
+        self.allowed.clear()
+        self.refresh_apps()
 
 
-class LockInScreen(QWidget):
-    """Screen shown during active focus session - transparent and always on top"""
+class HistoryScreen(QWidget):
+    """Past sessions, newest first, with notes."""
 
-    emergency_exit_requested = pyqtSignal()
-
-    def __init__(self, session_manager: SessionManager, parent=None):
+    def __init__(self, stats_tracker: StatsTracker, parent=None):
         super().__init__(parent)
-        self.session_manager = session_manager
-        self._setup_ui()
-        self._connect_signals()
+        self.setObjectName("Screen")
+        self.stats_tracker = stats_tracker
 
-    def _setup_ui(self):
-        """Setup UI components"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(20)
-        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setContentsMargins(36, 32, 36, 28)
+        layout.setSpacing(18)
+        layout.addWidget(label("History", "display"))
 
-        # Session name
-        self.session_name_label = QLabel()
-        self.session_name_label.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
-        self.session_name_label.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
-        self.session_name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.session_name_label)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.container = QWidget()
+        self.container.setObjectName("Screen")
+        self.list_layout = QVBoxLayout(self.container)
+        self.list_layout.setContentsMargins(0, 0, 8, 0)
+        self.list_layout.setSpacing(12)
+        self.scroll.setWidget(self.container)
+        layout.addWidget(self.scroll, 1)
 
-        # Timer display
-        self.timer_display = TimerDisplay()
-        layout.addWidget(self.timer_display)
+    def refresh(self):
+        while self.list_layout.count():
+            item = self.list_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
-        # Progress bar card
-        self.progress_card = ProgressCard("Session Progress")
-        layout.addWidget(self.progress_card)
+        sessions = self.stats_tracker.get_recent_sessions(limit=30)
+        if not sessions:
+            empty = label("No sessions yet. Go lock in.", "sub")
+            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.list_layout.addWidget(empty)
+        for s in sessions:
+            self.list_layout.addWidget(self._session_card(s))
+        self.list_layout.addStretch()
 
-        # Stats cards in a grid
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(15)
+    def _session_card(self, s: dict) -> Card:
+        card = Card(padding=18, spacing=6)
+        top = QHBoxLayout()
+        name = label(s["name"])
+        font = name.font()
+        font.setBold(True)
+        name.setFont(font)
+        top.addWidget(name)
+        top.addStretch()
+        top.addWidget(label(self._fmt_date(s.get("created_at", "")), "hint"))
+        card.body.addLayout(top)
 
-        self.elapsed_card = SessionInfoCard("Time Elapsed", "00:00")
-        stats_layout.addWidget(self.elapsed_card)
+        summary = (
+            f"{s['time_locked_in_formatted']} of {s['duration_formatted']}"
+            f"  ·  {s['completion_percentage']:.0f}% complete"
+            f"  ·  {s['apps_blocked_count']} blocked"
+        )
+        if s.get("emergency_exit_used"):
+            summary += "  ·  ended early"
+        card.body.addWidget(label(summary, "sub"))
 
-        self.remaining_card = SessionInfoCard("Time Remaining", "00:00")
-        stats_layout.addWidget(self.remaining_card)
+        notes = (s.get("notes") or "").strip()
+        if notes:
+            preview = notes if len(notes) <= 160 else notes[:157] + "…"
+            card.body.addWidget(label(f"“{preview}”", "hint"))
+        return card
 
-        self.blocked_card = SessionInfoCard("Apps Blocked", "0")
-        stats_layout.addWidget(self.blocked_card)
+    @staticmethod
+    def _fmt_date(raw: str) -> str:
+        try:
+            return datetime.fromisoformat(raw).strftime("%b %d, %H:%M")
+        except (ValueError, TypeError):
+            return raw or ""
 
-        layout.addLayout(stats_layout)
 
-        # Motivational quote
-        self.quote_widget = MotivationalQuote()
-        layout.addWidget(self.quote_widget)
+class StatsScreen(QWidget):
+    """Lifetime numbers: totals, streaks, most-blocked offenders."""
 
-        layout.addStretch()
+    def __init__(self, stats_tracker: StatsTracker, parent=None):
+        super().__init__(parent)
+        self.setObjectName("Screen")
+        self.stats_tracker = stats_tracker
 
-        # Emergency exit button
-        exit_btn = ModernButton("Emergency Exit", danger=True)
-        exit_btn.clicked.connect(self._request_emergency_exit)
-        exit_btn.setMaximumWidth(180)
-        exit_btn.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(36, 32, 36, 28)
+        layout.setSpacing(18)
+        layout.addWidget(label("Stats", "display"))
 
-        exit_layout = QHBoxLayout()
-        exit_layout.addStretch()
-        exit_layout.addWidget(exit_btn)
-        exit_layout.addStretch()
+        tiles = QGridLayout()
+        tiles.setSpacing(14)
+        self.total_tile = StatTile("Total focus time")
+        self.sessions_tile = StatTile("Sessions")
+        self.streak_tile = StatTile("Current streak")
+        self.best_streak_tile = StatTile("Longest streak")
+        tiles.addWidget(self.total_tile, 0, 0)
+        tiles.addWidget(self.sessions_tile, 0, 1)
+        tiles.addWidget(self.streak_tile, 0, 2)
+        tiles.addWidget(self.best_streak_tile, 0, 3)
+        layout.addLayout(tiles)
 
-        layout.addLayout(exit_layout)
+        row = QHBoxLayout()
+        row.setSpacing(14)
 
-    def _connect_signals(self):
-        """Connect session manager signals"""
-        self.session_manager.session_updated.connect(self._update_display)
-        self.session_manager.app_blocked.connect(self._on_app_blocked)
+        self.week_card = Card(padding=20, spacing=8)
+        self.week_card.body.addWidget(label("THIS WEEK", "statLabel"))
+        self.week_value = label("–", "statValue")
+        self.week_card.body.addWidget(self.week_value)
+        self.week_caption = label("", "hint")
+        self.week_card.body.addWidget(self.week_caption)
+        self.week_card.body.addStretch()
+        row.addWidget(self.week_card, 1)
 
-    def _update_display(self, elapsed_seconds: int, remaining_seconds: int):
-        """Update display with current session info"""
-        # Update timer
-        hours = remaining_seconds // 3600
-        minutes = (remaining_seconds % 3600) // 60
-        seconds = remaining_seconds % 60
-        self.timer_display.set_time(hours, minutes, seconds)
+        self.blocked_card = Card(padding=20, spacing=8)
+        self.blocked_card.body.addWidget(label("MOST BLOCKED", "statLabel"))
+        self.blocked_rows = QVBoxLayout()
+        self.blocked_rows.setSpacing(6)
+        self.blocked_card.body.addLayout(self.blocked_rows)
+        self.blocked_card.body.addStretch()
+        row.addWidget(self.blocked_card, 1)
 
-        # Update cards
-        elapsed_formatted = SessionManager.format_time(elapsed_seconds)
-        remaining_formatted = SessionManager.format_time(remaining_seconds)
+        layout.addLayout(row, 1)
 
-        self.elapsed_card.set_value(elapsed_formatted)
-        self.remaining_card.set_value(remaining_formatted)
+    def refresh(self):
+        totals = self.stats_tracker.get_total_stats()
+        self.total_tile.set_value(totals.get("total_time_formatted", "0h 0m"))
+        self.sessions_tile.set_value(str(totals.get("total_sessions") or 0))
 
-        # Update progress
-        progress = int(self.session_manager.get_progress_percentage())
-        self.progress_card.set_progress(progress)
+        streaks = self.stats_tracker.get_streak_info()
+        self.streak_tile.set_value(f"{streaks['current_streak']} d")
+        self.best_streak_tile.set_value(f"{streaks['longest_streak']} d")
 
-    def _on_app_blocked(self, app_name: str, total_blocked: int):
-        """Handle app blocked event"""
-        self.blocked_card.set_value(str(total_blocked))
-
-    def start_display(self):
-        """Initialize display for session start"""
-        session_info = self.session_manager.get_session_info()
-        self.session_name_label.setText(session_info['name'])
-        self.blocked_card.set_value("0")
-
-        # Initial update with starting values
-        self._update_display(0, session_info['duration'])
-
-    def _request_emergency_exit(self):
-        """Request emergency exit"""
-        reply = QMessageBox.warning(
-            self, "Emergency Exit",
-            "Are you sure you want to exit early?\n\nThis will end your focus session and restore all applications.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
+        week = self.stats_tracker.get_weekly_stats()
+        self.week_value.setText(week["total_time_formatted"])
+        self.week_caption.setText(
+            f"{week['total_sessions']} sessions · "
+            f"{week['total_apps_blocked']} apps blocked"
         )
 
-        if reply == QMessageBox.StandardButton.Yes:
-            self.emergency_exit_requested.emit()
+        while self.blocked_rows.count():
+            item = self.blocked_rows.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                while item.layout().count():
+                    sub = item.layout().takeAt(0)
+                    if sub.widget():
+                        sub.widget().deleteLater()
+        top = self.stats_tracker.get_top_blocked_apps(limit=5)
+        if not top:
+            self.blocked_rows.addWidget(
+                label("Nothing blocked yet - clean hands.", "sub")
+            )
+        for app in top:
+            row = QHBoxLayout()
+            row.addWidget(label(app["app_name"], "sub"))
+            row.addStretch()
+            row.addWidget(label(f"{app['total_blocks']}×", "accent"))
+            self.blocked_rows.addLayout(row)
 
 
 class SessionEndScreen(QWidget):
-    """Screen shown after session ends"""
+    """Post-session debrief: numbers, comparison, notes."""
 
     new_session_requested = pyqtSignal()
-    view_stats_requested = pyqtSignal()
 
-    def __init__(self, session_manager: SessionManager,
-                 stats_tracker: StatsTracker, parent=None):
+    def __init__(self, stats_tracker: StatsTracker, parent=None):
         super().__init__(parent)
-        self.session_manager = session_manager
+        self.setObjectName("Screen")
         self.stats_tracker = stats_tracker
-        self._setup_ui()
 
-    def _setup_ui(self):
-        """Setup UI components"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(25)
-        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setContentsMargins(36, 40, 36, 32)
+        layout.setSpacing(18)
 
-        # Title
-        self.title_label = QLabel("Session Complete!")
-        self.title_label.setFont(QFont("Segoe UI", 36, QFont.Weight.Bold))
-        self.title_label.setStyleSheet(f"color: {COLORS['accent_primary']}; background: transparent;")
-        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.title_label)
+        self.title = label("Session complete", "display")
+        layout.addWidget(self.title)
+        self.subtitle = label("", "sub")
+        layout.addWidget(self.subtitle)
 
-        # Session name
-        self.session_name_label = QLabel()
-        self.session_name_label.setFont(QFont("Segoe UI", 18))
-        self.session_name_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
-        self.session_name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.session_name_label)
+        tiles = QGridLayout()
+        tiles.setSpacing(14)
+        self.locked_tile = StatTile("Locked in")
+        self.planned_tile = StatTile("Planned")
+        self.blocked_tile = StatTile("Apps blocked")
+        self.completion_tile = StatTile("Completion")
+        tiles.addWidget(self.locked_tile, 0, 0)
+        tiles.addWidget(self.planned_tile, 0, 1)
+        tiles.addWidget(self.blocked_tile, 0, 2)
+        tiles.addWidget(self.completion_tile, 0, 3)
+        layout.addLayout(tiles)
 
-        # Stats grid
-        stats_layout = QGridLayout()
-        stats_layout.setSpacing(20)
+        self.comparison = label("", "sub")
+        layout.addWidget(self.comparison)
 
-        self.time_card = SessionInfoCard("Time Locked In", "0m")
-        stats_layout.addWidget(self.time_card, 0, 0)
-
-        self.duration_card = SessionInfoCard("Planned Duration", "0m")
-        stats_layout.addWidget(self.duration_card, 0, 1)
-
-        self.blocked_card = SessionInfoCard("Apps Blocked", "0")
-        stats_layout.addWidget(self.blocked_card, 1, 0)
-
-        self.completion_card = SessionInfoCard("Completion", "0%")
-        stats_layout.addWidget(self.completion_card, 1, 1)
-
-        layout.addLayout(stats_layout)
-
-        # Comparison section - PREMIUM CARD DESIGN with shadow
-        comparison_card = ModernCard()
-        comparison_layout = QVBoxLayout(comparison_card)
-        comparison_layout.setContentsMargins(30, 30, 30, 30)
-
-        self.comparison_label = QLabel()
-        self.comparison_label.setWordWrap(True)
-        self.comparison_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.comparison_label.setStyleSheet(f"""
-            QLabel {{
-                color: {COLORS['text_secondary']};
-                font-size: 15px;
-                background: transparent;
-                line-height: 1.6;
-            }}
-        """)
-        comparison_layout.addWidget(self.comparison_label)
-
-        layout.addWidget(comparison_card)
-
-        # Session notes section - PREMIUM CARD DESIGN
-        self.notes_card = ModernCard()
-        notes_layout = QVBoxLayout(self.notes_card)
-        notes_layout.setContentsMargins(30, 30, 30, 30)
-
-        notes_title = QLabel("📝 Session Notes")
-        notes_title.setStyleSheet(f"""
-            QLabel {{
-                color: {COLORS['text_primary']};
-                font-size: 18px;
-                font-weight: 700;
-                background: transparent;
-                margin-bottom: 10px;
-            }}
-        """)
-        notes_layout.addWidget(notes_title)
-
-        self.notes_label = QLabel("No notes for this session.")
+        self.notes_card = Card(padding=20, spacing=8)
+        self.notes_card.body.addWidget(label("YOUR NOTES", "statLabel"))
+        self.notes_label = label("", "sub")
         self.notes_label.setWordWrap(True)
-        self.notes_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        self.notes_label.setStyleSheet(f"""
-            QLabel {{
-                color: {COLORS['text_secondary']};
-                font-size: 14px;
-                background: transparent;
-                line-height: 1.5;
-                padding: 10px;
-            }}
-        """)
-        notes_layout.addWidget(self.notes_label)
-
+        self.notes_card.body.addWidget(self.notes_label)
+        self.notes_card.setVisible(False)
         layout.addWidget(self.notes_card)
-        self.notes_card.hide()  # Initially hidden, show only if notes exist
 
         layout.addStretch()
-
-        # Buttons
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-
-        new_session_btn = ModernButton("Start New Session", primary=True)
-        new_session_btn.clicked.connect(self.new_session_requested.emit)
-        button_layout.addWidget(new_session_btn)
-
-        layout.addLayout(button_layout)
+        actions = QHBoxLayout()
+        actions.addStretch()
+        again = button("Start another session", "primary")
+        again.clicked.connect(self.new_session_requested.emit)
+        actions.addWidget(again)
+        layout.addLayout(actions)
 
     def show_results(self, session_id: int, emergency_exit: bool):
-        """Display session results"""
         if emergency_exit:
-            self.title_label.setText("Session Ended Early")
-            self.title_label.setStyleSheet(f"color: {COLORS['danger']}; background: transparent;")
+            self.title.setText("Ended early")
+            self.title.setProperty("role", "danger")
         else:
-            self.title_label.setText("Session Complete!")
-            self.title_label.setStyleSheet(f"color: {COLORS['accent_primary']}; background: transparent;")
+            self.title.setText("Session complete")
+            self.title.setProperty("role", "display")
+        # repolish after property change
+        self.title.style().unpolish(self.title)
+        self.title.style().polish(self.title)
 
-        # Get session details
         session = self.stats_tracker.get_session_details(session_id)
         if not session:
             return
+        self.subtitle.setText(session["name"])
+        self.locked_tile.set_value(session["time_locked_in_formatted"])
+        self.planned_tile.set_value(session["duration_formatted"])
+        self.blocked_tile.set_value(str(session["apps_blocked_count"]))
+        self.completion_tile.set_value(f"{session['completion_percentage']:.0f}%")
 
-        self.session_name_label.setText(session['name'])
-
-        # Update cards
-        self.time_card.set_value(session['time_locked_in_formatted'])
-        self.duration_card.set_value(session['duration_formatted'])
-        self.blocked_card.set_value(str(session['apps_blocked_count']))
-        self.completion_card.set_value(f"{session['completion_percentage']:.0f}%")
-
-        # Show comparison
-        comparison = self.stats_tracker.compare_to_previous(session_id)
-        if comparison.get('has_previous'):
-            if comparison['time_improved']:
-                comp_text = f"🎉 You locked in {comparison['time_difference_formatted']} longer than last time!\n\nKeep up the great work!"
+        comp = self.stats_tracker.compare_to_previous(session_id)
+        if comp.get("has_previous"):
+            if comp["time_improved"]:
+                self.comparison.setText(
+                    f"{comp['time_difference_formatted']} longer than last time. "
+                    "Keep stacking."
+                )
             else:
-                comp_text = f"Last session was {comparison['time_difference_formatted']} longer.\n\nYou'll get it next time!"
+                self.comparison.setText(
+                    f"Last session was {comp['time_difference_formatted']} longer. "
+                    "Next one's yours."
+                )
         else:
-            comp_text = "This is your first session!\n\nGreat start. Keep building the habit."
+            self.comparison.setText("First session logged. The streak starts now.")
 
-        self.comparison_label.setText(comp_text)
+        notes = (session.get("notes") or "").strip()
+        self.notes_label.setText(notes)
+        self.notes_card.setVisible(bool(notes))
 
-        # Show session notes if they exist
-        notes = session.get('notes', '')
-        if notes and notes.strip():
-            self.notes_label.setText(notes)
-            self.notes_card.show()
-        else:
-            self.notes_card.hide()
 
+# ================================================================ shell
 
 class MainWindow(QMainWindow):
-    """Main application window with resizable, transparent lock-in screen"""
+    """App shell: nav rail + screens + floating focus pill."""
 
     def __init__(self):
         super().__init__()
         self.db_manager = DatabaseManager()
         self.session_manager = SessionManager(self.db_manager)
         self.stats_tracker = StatsTracker(self.db_manager)
-
-        self._setup_ui()
-        self._connect_signals()
-
-        # Prevent closing during active session
         self.allow_close = True
 
-    def _setup_ui(self):
-        """Setup main window UI"""
-        self.setWindowTitle("LockIN - Focus & Productivity")
+        saved = self.db_manager.get_setting("theme", "light")
+        apply_theme(QApplication.instance(), saved)
 
-        # Make window 90% of screen size (fullscreen-ish)
+        self._build_ui()
+        self._connect()
+
+    # ---- ui
+
+    def _build_ui(self):
+        self.setWindowTitle("Lock In")
         screen = QApplication.primaryScreen()
         if screen:
-            screen_geometry = screen.availableGeometry()
-            max_width = 1200
-            max_height = 750
-            width = min(max_width, screen_geometry.width() - 100)
-            height = min(max_height, screen_geometry.height() - 100)
+            geo = screen.availableGeometry()
+            w = min(1140, int(geo.width() * 0.9))
+            h = min(760, int(geo.height() * 0.9))
+            self.setGeometry(
+                geo.x() + (geo.width() - w) // 2,
+                geo.y() + (geo.height() - h) // 2, w, h,
+            )
+        self.setMinimumSize(960, 620)
 
-            # Center the window
-            x = (screen_geometry.width() - width) // 2
-            y = (screen_geometry.height() - height) // 2
+        root = QWidget()
+        root_layout = QHBoxLayout(root)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+        self.setCentralWidget(root)
 
-            self.setGeometry(x, y, max_width, max_height)
-        else:
-            # Fallback if screen detection fails
-            self.setMinimumSize(max_width, max_height)
-            self.resize(max_width, max_height)
+        # nav rail
+        rail = QWidget()
+        rail.setObjectName("NavRail")
+        rail.setFixedWidth(92)
+        rail_layout = QVBoxLayout(rail)
+        rail_layout.setContentsMargins(10, 20, 10, 16)
+        rail_layout.setSpacing(8)
 
-        # Apply light theme (modern, clean design)
-        self.setStyleSheet(f"""
-            QMainWindow {{
-                background-color: {COLORS['bg_primary']};
-            }}
-            QWidget {{
-                background-color: {COLORS['bg_primary']};
-                color: {COLORS['text_primary']};
-            }}
-        """)
+        logo = label("●", "accent")
+        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_font = logo.font()
+        logo_font.setPointSize(16)
+        logo.setFont(logo_font)
+        rail_layout.addWidget(logo)
+        rail_layout.addSpacing(12)
 
-        # Stack widget for different screens
+        self.nav_group = QButtonGroup(self)
+        self.nav_group.setExclusive(True)
+        self.nav_buttons = {}
+        for key, text in [("focus", "Focus"), ("history", "History"),
+                          ("stats", "Stats")]:
+            btn = button(text, "nav")
+            btn.setCheckable(True)
+            self.nav_group.addButton(btn)
+            self.nav_buttons[key] = btn
+            rail_layout.addWidget(btn)
+        rail_layout.addStretch()
+
+        self.theme_btn = button("Dark" if mode() == "light" else "Light", "nav",
+                                "Switch theme")
+        self.theme_btn.clicked.connect(self._toggle_theme)
+        rail_layout.addWidget(self.theme_btn)
+        root_layout.addWidget(rail)
+
+        # screens
         self.stack = QStackedWidget()
-        self.setCentralWidget(self.stack)
+        self.setup_screen = FocusSetupScreen(self.session_manager)
+        self.history_screen = HistoryScreen(self.stats_tracker)
+        self.stats_screen = StatsScreen(self.stats_tracker)
+        self.end_screen = SessionEndScreen(self.stats_tracker)
+        for s in (self.setup_screen, self.history_screen,
+                  self.stats_screen, self.end_screen):
+            self.stack.addWidget(s)
+        root_layout.addWidget(self.stack, 1)
 
-        # Create screens
-        self.setup_screen = SessionSetupScreen(self.session_manager)
-        self.end_screen = SessionEndScreen(self.session_manager, self.stats_tracker)
-
-        # Create vertical sidebar (separate window, not in stack)
-        self.sidebar = VerticalSidebarLockIn(self.session_manager)
-
-        # Create popup widgets
-        self.stats_popup = QuickStatsPopup(self.session_manager, self.stats_tracker)
-        self.notes_popup = SessionNotesPopup(self.session_manager)
-
-        # Add screens to stack (sidebar is NOT in stack - it's its own window)
-        self.stack.addWidget(self.setup_screen)
-        self.stack.addWidget(self.end_screen)
-
-        # Start with setup screen
+        self.nav_buttons["focus"].setChecked(True)
         self.stack.setCurrentWidget(self.setup_screen)
 
-    def _connect_signals(self):
-        """Connect signals between components"""
-        # Setup screen signals
+        # floating session UI
+        self.pill = FocusPill(self.session_manager)
+        self.stats_popover = StatsPopover(self.session_manager, self.stats_tracker)
+        self.notes_popover = NotesPopover(self.session_manager)
+
+    def _connect(self):
+        self.nav_buttons["focus"].clicked.connect(
+            lambda: self.stack.setCurrentWidget(self.setup_screen))
+        self.nav_buttons["history"].clicked.connect(self._show_history)
+        self.nav_buttons["stats"].clicked.connect(self._show_stats)
+
         self.setup_screen.start_session_requested.connect(self._start_session)
-
-        # Vertical sidebar signals
-        self.sidebar.emergency_exit_requested.connect(self._emergency_exit)
-        self.sidebar.stats_button.clicked.connect(self._show_stats_popup)
-        self.sidebar.notes_button.clicked.connect(self._show_notes_popup)
-
-        # Popup signals
-        self.notes_popup.notes_saved.connect(self._on_notes_saved)
-
-        # End screen signals
         self.end_screen.new_session_requested.connect(self._new_session)
 
-        # Session manager signals
-        self.session_manager.session_started.connect(self._on_session_started)
+        self.pill.exit_requested.connect(self._emergency_exit)
+        self.pill.stats_requested.connect(
+            lambda: self.stats_popover.refresh_and_open(self.pill))
+        self.pill.notes_requested.connect(
+            lambda: self.notes_popover.refresh_and_open(self.pill))
+
         self.session_manager.session_ended.connect(self._on_session_ended)
 
-    def _start_session(self, name: str, duration_mins: int, apps: list):
-        """Start a new focus session"""
-        # Setup session
-        success = self.session_manager.setup_session(
-            name=name,
-            duration_minutes=duration_mins,
-            whitelisted_apps=apps
-        )
+    # ---- navigation
 
-        if not success:
-            QMessageBox.critical(self, "Error", "Failed to setup session.")
+    def _show_history(self):
+        self.history_screen.refresh()
+        self.stack.setCurrentWidget(self.history_screen)
+
+    def _show_stats(self):
+        self.stats_screen.refresh()
+        self.stack.setCurrentWidget(self.stats_screen)
+
+    def _toggle_theme(self):
+        new_mode = "dark" if mode() == "light" else "light"
+        apply_theme(QApplication.instance(), new_mode)
+        self.db_manager.set_setting("theme", new_mode)
+        self.theme_btn.setText("Dark" if new_mode == "light" else "Light")
+        self.setup_screen.refresh_apps()  # re-tint running indicators
+
+    # ---- session lifecycle
+
+    def _start_session(self, name: str, minutes: int, apps: list):
+        if self.session_manager.current_state != SessionState.IDLE:
+            self.session_manager.reset()
+        if not self.session_manager.setup_session(name, minutes, apps):
+            QMessageBox.critical(self, "Error", "Could not set up the session.")
             return
-
-        # Start session
-        success = self.session_manager.start_session()
-        if not success:
-            QMessageBox.critical(self, "Error", "Failed to start session.")
+        if not self.session_manager.start_session():
+            QMessageBox.critical(self, "Error", "Could not start the session.")
+            self.session_manager.reset()
             return
-
-        # Show the vertical sidebar (NEW: taskbar-style lock-in screen)
-        self.sidebar.start_display()
-
-        # Keep main window visible but user can minimize it
-        # The sidebar will stay on top regardless
-        self.setWindowState(Qt.WindowState.WindowMinimized)  # Minimize main window
-
-        # Prevent closing
         self.allow_close = False
+        self.pill.start_display()
+        self.showMinimized()
 
     def _emergency_exit(self):
-        """Handle emergency exit"""
-        self.allow_close = True
-
-        # Hide the sidebar
-        self.sidebar.hide()
-
-        # Restore main window
-        self.setWindowState(Qt.WindowState.WindowNoState)  # Restore from minimized
-        self.showNormal()
-        self.activateWindow()
-
         self.session_manager.end_session(emergency_exit=True)
 
-    def _new_session(self):
-        """Start a new session"""
-        # Reset session manager to IDLE state (critical fix for session restart)
-        self.session_manager.reset()
-
-        # Reset the form
-        self.setup_screen.reset_form()
-        self.stack.setCurrentWidget(self.setup_screen)
-
-        # Hide sidebar if visible
-        self.sidebar.hide()
-
-        # Hide popups if visible
-        self.stats_popup.hide()
-        self.notes_popup.hide()
-
-        # Restore main window
-        self.setWindowState(Qt.WindowState.WindowNoState)
-        self.showNormal()
-        self.activateWindow()
-
-        # Re-enable close
-        self.allow_close = True
-
-    def _on_session_started(self, session_id: int):
-        """Handle session started"""
-        print(f"Session {session_id} started")
-
     def _on_session_ended(self, session_id: int, emergency_exit: bool):
-        """Handle session ended"""
         self.allow_close = True
-
-        # Hide the sidebar
-        self.sidebar.hide()
-
-        # Restore main window
+        for w in (self.pill, self.stats_popover, self.notes_popover):
+            w.hide()
         self.setWindowState(Qt.WindowState.WindowNoState)
         self.showNormal()
+        self.raise_()
         self.activateWindow()
-
-        # Show end screen
         self.end_screen.show_results(session_id, emergency_exit)
         self.stack.setCurrentWidget(self.end_screen)
 
-    def _show_stats_popup(self):
-        """Show the quick stats popup"""
-        self.stats_popup.show_stats()
+    def _new_session(self):
+        self.session_manager.reset()
+        self.setup_screen.reset_form()
+        self.nav_buttons["focus"].setChecked(True)
+        self.stack.setCurrentWidget(self.setup_screen)
 
-    def _show_notes_popup(self):
-        """Show the session notes popup"""
-        self.notes_popup.show_notes()
-
-    def _on_notes_saved(self, notes: str):
-        """Handle notes saved"""
-        print(f"Session notes saved: {notes[:50]}...")  # Log first 50 chars
+    # ---- close guard
 
     def closeEvent(self, event: QCloseEvent):
-        """Handle window close event"""
         if not self.allow_close and self.session_manager.is_session_active():
-            reply = QMessageBox.warning(
-                self, "Session Active",
-                "A focus session is currently active.\n\nUse Emergency Exit to end it first, or the session will continue in the background.",
-                QMessageBox.StandardButton.Ok
+            QMessageBox.warning(
+                self, "Session active",
+                "A focus session is running. End it from the floating "
+                "timer before closing.",
             )
             event.ignore()
-        else:
-            # Cleanup
-            self.session_manager.reset()
-            self.db_manager.close()
-            event.accept()
+            return
+        self.session_manager.reset()
+        self.db_manager.close()
+        event.accept()

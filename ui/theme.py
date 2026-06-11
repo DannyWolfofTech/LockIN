@@ -124,6 +124,7 @@ QLabel[role="statLabel"] {{
     letter-spacing: 1px;
 }}
 QLabel[role="accent"]  {{ color: {c['accent']}; }}
+QLabel[role="danger"]  {{ color: {c['danger']}; }}
 QLabel[role="timer"] {{
     font-family: {MONO_STACK};
     font-size: 24px; font-weight: 700; color: {c['accent']};
