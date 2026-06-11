@@ -4,15 +4,17 @@ Handles process detection, blocking, and management
 """
 
 import psutil
-import time
 import sys
 import os
-import re
-from typing import List, Set, Callable, Optional, Dict
+from typing import List, Set, Optional, Dict
 from pathlib import Path
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QFileIconProvider, QStyle, QApplication
+from PyQt6.QtWidgets import QFileIconProvider
+
+from core.app_filter import (
+    is_displayable, is_protected, is_garbage_name, friendly_name,
+)
 
 # Optional imports for Windows icon extraction
 try:
@@ -39,127 +41,6 @@ class AppBlocker(QObject):
     app_launched = pyqtSignal(str)  # app_name
     error_occurred = pyqtSignal(str)  # error_message
 
-    # Critical system processes that should NEVER be terminated
-    CRITICAL_PROCESSES = {
-        # Windows System Processes
-        'system', 'smss.exe', 'csrss.exe', 'wininit.exe', 'services.exe',
-        'lsass.exe', 'winlogon.exe', 'svchost.exe', 'explorer.exe',
-        'dwm.exe', 'taskmgr.exe', 'conhost.exe', 'fontdrvhost.exe',
-        'wmi provider host', 'wmiprvse.exe', 'sihost.exe', 'taskhostw.exe',
-        'registry', 'memory compression', 'system idle process',
-
-        # Linux System Processes
-        'systemd', 'init', 'kthreadd', 'bash', 'sh', 'zsh', 'fish',
-        'ssh', 'sshd', 'dbus-daemon', 'systemd-logind',
-
-        # macOS System Processes
-        'launchd', 'kernel_task', 'loginwindow', 'WindowServer',
-        'Dock', 'Finder', 'SystemUIServer',
-
-        # Python/PyQt (don't kill ourselves!)
-        'python', 'python.exe', 'python3', 'python3.exe', 'pythonw.exe',
-    }
-
-    # Additional processes to always whitelist - system services and background tasks
-    # AGGRESSIVE FILTERING - Hide from Available Apps list (but don't terminate)
-    SYSTEM_WHITELIST = {
-        # Security and System Tools
-        'antimalware service executable', 'windows defender',
-        'securityhealthservice.exe', 'msmpeng.exe', 'msedge_pwahelper.exe',
-        'windows security notification icon', 'sgrmbroker.exe', 'securityhealthsystray.exe',
-        'securityhealthhost.exe',
-
-        # Essential Windows Services
-        'runtimebroker.exe', 'searchindexer.exe', 'spoolsv.exe',
-        'audiodg.exe', 'consent.exe', 'ctfmon.exe', 'dllhost.exe',
-        'backgroundtaskhost.exe', 'applicationframehost.exe',
-
-        # Windows System Apps (hide from user)
-        'textinputhost.exe', 'shellexperiencehost.exe', 'searchapp.exe',
-        'searchhost.exe', 'startmenuexperiencehost.exe', 'runtimebroker.exe',
-        'lockapp.exe', 'windows.warp.jitservice.exe', 'usocoreworker.exe',
-        'mobsync.exe', 'unsecapp.exe', 'wermgr.exe', 'winrshost.exe',
-
-        # Windows Update and Maintenance
-        'windows update', 'usoclient.exe', 'tiworker.exe', 'trustedinstaller.exe',
-        'musnotification.exe', 'musnotifyicon.exe',
-
-        # Drivers and Hardware
-        'nvdisplay.container.exe', 'nvcontainer.exe', 'amdrsserv.exe',
-        'radiergw.exe', 'igfxem.exe', 'igfxtray.exe', 'hkcmd.exe',
-        'atkexcomsvc.exe', 'asustptloader.exe', 'winring0', 'winring0.exe',
-        'winring0x64.sys', 'winring0_1_2_0', 'frameviewsdk.exe',
-
-        # Background System Tasks
-        'useroobebroker.exe', 'searchprotocolhost.exe', 'searchfilterhost.exe',
-        'compattelrunner.exe', 'oobe.exe', 'cloudexperiencehostbroker.exe',
-
-        # Chromium Embedded Framework (CEF) - used by apps like Discord, VS Code
-        'cef', 'cefsharp.browsersubprocess.exe', 'cefsharp', 'libcef.dll',
-
-        # .NET and Runtime Components
-        'mscorsvw.exe', 'ngen.exe', 'ngentask.exe', 'clr.dll',
-        'dotnet.exe', 'msbuild.exe',
-
-        # Windows Background Services
-        'gamebarpresencewriter.exe', 'gamebar.exe', 'xboxstat.exe',
-        'smartscreen.exe', 'fmapi.exe', 'phoneexperiencehost.exe',
-        'yourphone.exe', 'windowsinternalshellexperiencehost.exe',
-
-        # Windows Notifications & UI
-        'notificationcontroller.exe', 'notificationplatform.exe',
-        'actioncenter.exe', 'cortana.exe', 'msteams', 'skype',
-
-        # System Utilities (hide from user)
-        'perfmon.exe', 'resmon.exe', 'mmc.exe', 'eventvwr.exe',
-        'certutil.exe', 'netsh.exe', 'powershell.exe', 'cmd.exe',
-        'powershell_ise.exe', 'wscript.exe', 'cscript.exe',
-
-        # Driver Framework & Support
-        'wudfhost.exe', 'wudfrd.exe', 'sdiagnhost.exe', 'systemsettingsbroker.exe',
-        'systemsettings.exe', 'settingssynchost.exe',
-
-        # Windows Subsystem for Linux
-        'wsl.exe', 'wslhost.exe', 'wslconfig.exe',
-
-        # Third-Party Background Processes (common utilities that auto-start)
-        'teamviewer', 'anydesk', 'logmein', 'ammyy', 'vnc',
-        'googlecrashhandler.exe', 'googleupdate.exe',
-        'adobearm.exe', 'adobeupdater.exe', 'acrotray.exe',
-        'dropbox.exe', 'onedrive.exe', 'icloud', 'googledrive',
-        'carbonblack', 'crowdstrike', 'sentinelone', 'cylance',
-
-        # GPU and Display Management
-        'nvstreamservice.exe', 'nvstreamsvc.exe', 'nvprofileupdaterservice64.exe',
-        'nvidia web helper.exe', 'nvidia share.exe', 'shadowplay',
-        'amd', 'radeon', 'ati', 'amdow.exe', 'radeonsoftware.exe',
-
-        # Audio/Video Services
-        'iastoricon.exe', 'realtekhdaudiomanager.exe', 'nahimicservice.exe',
-
-        # Antivirus and Security (hide background processes)
-        'avast', 'avg', 'malwarebytes', 'norton', 'mcafee',
-        'kaspersky', 'bitdefender', 'avira', 'eset', 'sophos',
-        'trendmicro', 'webroot', 'comodo',
-
-        # System Management (Dell, HP, Lenovo, etc.)
-        'dell', 'hp', 'lenovo', 'asus', 'acer', 'toshiba',
-        'samsungmagician', 'intelrapidstoragetechnology',
-    }
-
-    # System paths to exclude (processes in these folders are usually system processes)
-    SYSTEM_PATHS = [
-        'c:\\windows\\system32',
-        'c:\\windows\\syswow64',
-        'c:\\windows\\systemapps',
-        'c:\\windows\\immersivecontrolpanel',
-        '/usr/bin',
-        '/usr/sbin',
-        '/usr/lib',
-        '/lib',
-        '/System/Library',
-    ]
-
     def __init__(self, parent=None):
         """Initialize the app blocker"""
         super().__init__(parent)
@@ -185,7 +66,9 @@ class AppBlocker(QObject):
         """
         self.whitelisted_apps = set()
 
-        # Normalize app names/paths
+        # Normalize app names/paths. Only USER choices live here -
+        # system safety is handled separately by app_filter.is_protected,
+        # so a stray short token can't accidentally whitelist the world.
         for app in apps:
             app_lower = app.lower()
             self.whitelisted_apps.add(app_lower)
@@ -194,14 +77,6 @@ class AppBlocker(QObject):
             if '/' in app or '\\' in app:
                 filename = Path(app).name.lower()
                 self.whitelisted_apps.add(filename)
-
-        # Always include critical and system processes
-        self.whitelisted_apps.update(
-            p.lower() for p in self.CRITICAL_PROCESSES
-        )
-        self.whitelisted_apps.update(
-            p.lower() for p in self.SYSTEM_WHITELIST
-        )
 
     def start_monitoring(self) -> None:
         """Start monitoring and blocking processes"""
@@ -300,31 +175,24 @@ class AppBlocker(QObject):
         if not name:
             return True  # Skip unnamed processes
 
+        # Safety net: critical processes, system paths, security software
+        if is_protected(name, exe_path):
+            return True
+
         name_lower = name.lower()
+        stem = name_lower[:-4] if name_lower.endswith('.exe') else name_lower
+        path_lower = (exe_path or '').lower()
 
-        # Check if name matches any whitelisted app
-        if name_lower in self.whitelisted_apps:
-            return True
-
-        # Check if exe path matches
-        if exe_path:
-            exe_path_lower = exe_path.lower()
-
-            # Check full path
-            if exe_path_lower in self.whitelisted_apps:
+        # Match against the user's whitelist: exact name/stem, or the
+        # whitelisted entry (e.g. a display name like "chrome") appearing
+        # in the process name or its install path.
+        for entry in self.whitelisted_apps:
+            if entry in (name_lower, stem):
                 return True
-
-            # Check if any whitelisted app is in the path
-            for whitelisted in self.whitelisted_apps:
-                if whitelisted in exe_path_lower or whitelisted in name_lower:
-                    return True
-
-        # Check if it's a critical process
-        if name_lower in {p.lower() for p in self.CRITICAL_PROCESSES}:
-            return True
-
-        if name_lower in {p.lower() for p in self.SYSTEM_WHITELIST}:
-            return True
+            if entry in name_lower:
+                return True
+            if path_lower and entry in path_lower:
+                return True
 
         return False
 
@@ -379,170 +247,6 @@ class AppBlocker(QObject):
             self.known_processes.pop(pid, None)
             self.whitelisted_processes.discard(pid)
 
-    def _is_system_process(self, name: str, exe_path: str) -> bool:
-        
-        """
-        Check if a process is a system process that should be hidden from the user
-
-        Args:
-            name: Process name
-            exe_path: Full executable path
-
-        Returns:
-            True if it's a system process
-        """
-        if not name:
-            return True
-
-        name_lower = name.lower()
-
-        # Check if it's in critical or system whitelist
-        if name_lower in {p.lower() for p in self.CRITICAL_PROCESSES}:
-            return True
-
-        if name_lower in {p.lower() for p in self.SYSTEM_WHITELIST}:
-            return True
-
-        # Check if exe path is in system paths
-        if exe_path:
-            exe_path_lower = exe_path.lower()
-            for sys_path in self.SYSTEM_PATHS:
-                if exe_path_lower.startswith(sys_path.lower()):
-                    return True
-
-        # AGGRESSIVE FILTERING - Filter out common background processes and services
-        system_keywords = [
-            'service', 'host', 'broker', 'helper', 'installer', 'update',
-            'driver', 'daemon', 'agent', 'notif', 'manager', 'loader',
-            'crash', 'reporter', 'handler', 'sync', 'protocol', 'filter',
-            'compatibility', 'telemetry', 'diagnostics', 'feedback',
-            'framework', 'sdk', 'runtime', 'subprocess', 'wrapper',
-            'watchdog', 'monitor', 'launcher', 'bootstrapper', 'pwa',
-        ]
-        for keyword in system_keywords:
-            if keyword in name_lower:
-                return True
-
-        # Filter out processes with certain patterns (more aggressive)
-        # Filter CEF (Chromium Embedded Framework) subprocesses
-        if 'cef' in name_lower or 'renderer' in name_lower or 'gpu-process' in name_lower:
-            return True
-
-        # Filter crash/error handlers
-        if 'crash' in name_lower or 'dump' in name_lower or 'error' in name_lower:
-            return True
-
-        # Filter updaters
-        if 'updat' in name_lower or 'download' in name_lower:
-            return True
-
-        # ULTRA AGGRESSIVE FILTERING - Filter out all garbage
-        import re
-
-        # Filter if name starts with a number (version numbers like "142.0.3595.53")
-        if name_lower and name_lower[0].isdigit():
-            return True
-
-        # Filter if name is too long (Windows Store packages are often 50+ chars)
-        if len(name_lower) > 50:
-            return True
-
-        # Filter version patterns - anything with dots and numbers like "2.2543.1.0"
-        # This catches: "142.0.3595.53", "25.199.1012.0002_1", etc.
-        if re.search(r'\d+\.\d+\.\d+', name_lower):
-            return True
-
-        # Filter anything with 2 or more underscores (version numbers and package IDs)
-        if name_lower.count('_') >= 2:
-            return True
-
-        # Filter double underscore patterns (Windows Store package IDs)
-        if '__' in name_lower:
-            return True
-
-        # Filter architecture patterns
-        if 'x64' in name_lower or 'x86' in name_lower or 'arm64' in name_lower:
-            return True
-
-        # Filter Windows Store package patterns like "_cv1g1gvanyjgm" (random hash IDs)
-        # These are lowercase letters and numbers after underscore
-        if re.search(r'_[a-z0-9]{8,}', name_lower):
-            return True
-
-        # Filter Company.App_Version patterns
-        if '.' in name_lower and '_' in name_lower:
-            # Check for Company.AppName_version pattern
-            if re.search(r'\w+\.\w+_', name_lower):
-                return True
-
-        # Filter pure version numbers or build numbers
-        # Like "25.199.1012.0002" or similar
-        if re.match(r'^[\d.]+$', name_lower):
-            return True
-
-        return False
-    def _should_filter_app(self, name: str) -> bool:
-        """Filter out garbage app names (version numbers, package IDs, etc.)"""
-        if not name:
-            return True
-        
-        name_lower = name.lower()
-        
-        # Filter if starts with number (e.g., "142.0.3595.53")
-        if name_lower[0].isdigit():
-            return True
-        
-        # Filter version patterns (e.g., "25.199.1012.0002_1")
-        if re.search(r'\d+\.\d+\.\d+', name_lower):
-            return True
-        
-        # Filter Windows Store apps (2+ underscores)
-        if name.count('_') >= 2:
-            return True
-        
-        # Filter package IDs (contains _x64_ or _x86_)
-        if '_x64_' in name_lower or '_x86_' in name_lower:
-            return True
-        
-        # Filter very long names (likely package IDs)
-        if len(name) > 50:
-            return True
-        
-        return False
-
-    def _get_friendly_app_name(self, process_name: str, exe_path: str) -> str:
-        """
-        Get a friendly display name for an application
-
-        Args:
-            process_name: Process name (e.g., "chrome.exe")
-            exe_path: Full path to executable
-
-        Returns:
-            Friendly name (e.g., "Chrome")
-        """
-        # Remove .exe extension
-        name = process_name
-        if name.lower().endswith('.exe'):
-            name = name[:-4]
-
-        # Try to extract from path if available
-        if exe_path:
-            path_obj = Path(exe_path)
-            parent_name = path_obj.parent.name
-
-            # Use parent folder name for better clarity
-            # e.g., "Google\\Chrome\\Application\\chrome.exe" -> use "Chrome"
-            if parent_name.lower() not in ['bin', 'application', 'app', 'program files', 'program files (x86)']:
-                name = parent_name
-
-        # Capitalize properly
-        # Handle camelCase (e.g., "msedge" -> "MS Edge")
-        if name.islower() or name.isupper():
-            name = name.title()
-
-        return name
-
     def _get_app_icon(self, exe_path: str) -> Optional[QIcon]:
         """
         Try to extract icon from executable
@@ -593,18 +297,17 @@ class AppBlocker(QObject):
                     if not name or name.lower() in seen:
                         continue
 
-                    # Skip system processes
-                    if self._is_system_process(name, exe_path):
+                    # Positive heuristic: must look like a real user app
+                    if not is_displayable(name, exe_path):
                         continue
 
-                    # Skip garbage app names
-                    if self._should_filter_app(name):
+                    # Friendly display name (climbs out of version dirs);
+                    # if even that comes out as garbage, drop the entry.
+                    display_name = friendly_name(name, exe_path)
+                    if is_garbage_name(display_name):
                         continue
 
                     seen.add(name.lower())
-
-                    # Get friendly display name
-                    display_name = self._get_friendly_app_name(name, exe_path)
 
                     # Try to get icon
                     icon = self._get_app_icon(exe_path)
@@ -679,15 +382,17 @@ class AppBlocker(QObject):
                             continue
 
                         for file in files:
-                            if file.lower().endswith('.exe') and file.lower() != 'uninstall.exe':
+                            if file.lower().endswith('.exe'):
                                 exe_path = os.path.join(root, file)
 
-                                # Skip system processes
-                                if self._is_system_process(file, exe_path):
+                                # Must look like a real user app
+                                if not is_displayable(file, exe_path):
                                     continue
 
-                                # Get friendly name
-                                display_name = self._get_friendly_app_name(file, exe_path)
+                                # Friendly name; drop if it resolves to garbage
+                                display_name = friendly_name(file, exe_path)
+                                if is_garbage_name(display_name):
+                                    continue
 
                                 # Skip if already in our list
                                 if display_name in apps:
