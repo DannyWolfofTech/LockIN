@@ -12,9 +12,12 @@ Lock In is a desktop application designed to help you maintain deep focus by blo
 - **App Blocking**: Automatically closes and prevents non-whitelisted apps from running
 - **Real-time Monitoring**: Continuously monitors and blocks attempts to open distracting apps
 - **Session Tracking**: Stores all session data including duration, apps blocked, and completion rate
-- **Statistics Dashboard**: View your productivity trends, total focus time, and most blocked apps
+- **Statistics Dashboard**: Total focus time, streaks, weekly summary, and most-blocked apps
+- **Session History**: Every past session with completion rate and your notes
+- **Session Notes**: Jot down what you're working on from the floating timer
+- **Floating Focus Pill**: A small, draggable always-on-top timer during sessions — work normally, stay accountable
 - **Emergency Exit**: Safe way to exit a session early if needed
-- **Modern UI**: Clean, dark-themed interface with real-time updates
+- **Modern UI**: Clean light & dark themes with a single design system
 
 ## Tech Stack
 
@@ -30,16 +33,16 @@ LockIN/
 ├── main.py                 # Application entry point
 ├── requirements.txt        # Python dependencies
 ├── ui/                     # UI components
-│   ├── main_window.py     # Main window with all screens
-│   └── widgets.py         # Custom reusable widgets
+│   ├── theme.py           # Design system: palettes + global stylesheet
+│   ├── main_window.py     # App shell, nav rail, and all screens
+│   └── widgets.py         # Component library (cards, pill, popovers)
 ├── core/                   # Business logic
 │   ├── app_blocker.py     # Process management & blocking
 │   ├── session_manager.py # Session coordination
 │   └── stats_tracker.py   # Statistics & analytics
-├── database/               # Database layer
-│   ├── db_manager.py      # SQLite operations
-│   └── schema.sql         # Database schema
-└── assets/                 # Icons and images
+└── database/               # Database layer
+    ├── db_manager.py      # SQLite operations
+    └── schema.sql         # Database schema
 ```
 
 ## Installation
