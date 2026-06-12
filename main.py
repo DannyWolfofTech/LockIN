@@ -12,7 +12,6 @@ import os
 from pathlib import Path
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
-from PyQt6.QtCore import Qt
 
 # Add project root to path
 project_root = Path(__file__).parent
@@ -76,16 +75,10 @@ def main():
         # if not show_admin_warning():
         #     sys.exit(1)
 
-    # Create application
+    # Create application (Qt 6 handles high-DPI scaling automatically)
     app = QApplication(sys.argv)
     app.setApplicationName("Lock In")
     app.setOrganizationName("LockIn")
-
-    # Enable high DPI scaling
-    if hasattr(Qt, 'AA_EnableHighDpiScaling'):
-        QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling)
-    if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
-        QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
 
     # Create and show main window
     try:

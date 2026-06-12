@@ -281,6 +281,7 @@ class FocusPill(QWidget):
         self.strict = False
         self.elapsed = 0
         self.remaining = 0
+        self.duration_secs = 0
         self._drag_offset = None
 
         self.setWindowFlags(
@@ -342,7 +343,8 @@ class FocusPill(QWidget):
         info = self.session_manager.get_session_info()
         self.strict = strict
         self.elapsed = 0
-        self.remaining = info["duration"] if info else 0
+        self.duration_secs = info["duration"] if info else 0
+        self.remaining = self.duration_secs
         self.countdown = True
         self.collapsed = False
         self._apply_collapse()
@@ -359,9 +361,9 @@ class FocusPill(QWidget):
     def _on_tick(self, elapsed: int, remaining: int):
         self.elapsed, self.remaining = elapsed, remaining
         self._refresh()
-        info = self.session_manager.get_session_info()
-        if info and info["duration"] > 0:
-            self.progress.setValue(min(100, int(elapsed / info["duration"] * 100)))
+        if self.duration_secs > 0:
+            self.progress.setValue(
+                min(100, int(elapsed / self.duration_secs * 100)))
 
     def _refresh(self):
         secs = self.remaining if self.countdown else self.elapsed
@@ -553,3 +555,12 @@ class NotesPopover(_Popover):
         if self.session_manager.update_session_notes(self.editor.toPlainText()):
             self.saved_hint.setText("Saved ✓")
             QTimer.singleShot(1500, lambda: self.saved_hint.setText(""))
+
+    def hideEvent(self, event):
+        # Don't lose notes just because the popover was dismissed
+        # without hitting Save.
+        text = self.editor.toPlainText()
+        info = self.session_manager.get_session_info()
+        if info and text != info.get("notes", ""):
+            self.session_manager.update_session_notes(text)
+        super().hideEvent(event)

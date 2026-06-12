@@ -93,7 +93,8 @@ class SessionManager(QObject):
 
             self.session_name = name
             self.session_duration = duration_minutes * 60  # Convert to seconds
-            self.whitelisted_apps = whitelisted_apps
+            # Own copy - reset() clears this list in place
+            self.whitelisted_apps = list(whitelisted_apps)
             self.apps_blocked_count = 0
             self.session_notes = ""
 

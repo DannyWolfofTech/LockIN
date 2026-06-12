@@ -523,16 +523,19 @@ class SessionEndScreen(QWidget):
 
         comp = self.stats_tracker.compare_to_previous(session_id)
         if comp.get("has_previous"):
-            if comp["time_improved"]:
+            diff = comp["time_difference_seconds"]
+            if diff > 0:
                 self.comparison.setText(
                     f"{comp['time_difference_formatted']} longer than last time. "
                     "Keep stacking."
                 )
-            else:
+            elif diff < 0:
                 self.comparison.setText(
                     f"Last session was {comp['time_difference_formatted']} longer. "
                     "Next one's yours."
                 )
+            else:
+                self.comparison.setText("Dead even with last session. Break the tie.")
         else:
             self.comparison.setText("First session logged. The streak starts now.")
 
