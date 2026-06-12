@@ -183,38 +183,6 @@ class StatsTracker:
 
         return result
 
-    def get_most_productive_times(self) -> Dict[str, Any]:
-        """
-        Analyze when user is most productive
-
-        Returns:
-            Statistics about productive times
-        """
-        sessions = self.db_manager.get_all_sessions(limit=100)
-
-        hour_stats = {hour: {'count': 0, 'total_time': 0} for hour in range(24)}
-
-        for session in sessions:
-            try:
-                created_at = datetime.fromisoformat(session['created_at'])
-                hour = created_at.hour
-
-                hour_stats[hour]['count'] += 1
-                hour_stats[hour]['total_time'] += session['time_locked_in_seconds']
-
-            except (ValueError, KeyError):
-                continue
-
-        # Find peak hour
-        peak_hour = max(hour_stats.items(),
-                       key=lambda x: x[1]['total_time'])[0]
-
-        return {
-            'peak_hour': peak_hour,
-            'peak_hour_formatted': f"{peak_hour:02d}:00",
-            'hour_breakdown': hour_stats
-        }
-
     def get_top_blocked_apps(self, limit: int = 10) -> List[Dict[str, Any]]:
         """
         Get most frequently blocked applications
@@ -225,36 +193,7 @@ class StatsTracker:
         Returns:
             List of top blocked apps with counts
         """
-        # Get all sessions
-        sessions = self.db_manager.get_all_sessions(limit=1000)
-
-        app_counts = {}
-
-        for session in sessions:
-            blocked_apps = self.db_manager.get_blocked_apps_for_session(
-                session['id']
-            )
-
-            for app in blocked_apps:
-                app_name = app['app_name']
-                if app_name not in app_counts:
-                    app_counts[app_name] = {
-                        'app_name': app_name,
-                        'total_blocks': 0,
-                        'sessions_blocked_in': 0
-                    }
-
-                app_counts[app_name]['total_blocks'] += app['blocked_count']
-                app_counts[app_name]['sessions_blocked_in'] += 1
-
-        # Sort by total blocks
-        sorted_apps = sorted(
-            app_counts.values(),
-            key=lambda x: x['total_blocks'],
-            reverse=True
-        )
-
-        return sorted_apps[:limit]
+        return self.db_manager.get_top_blocked_apps(limit=limit)
 
     def get_streak_info(self) -> Dict[str, Any]:
         """
@@ -282,9 +221,12 @@ class StatsTracker:
             except (ValueError, KeyError):
                 continue
 
-        # Calculate current streak
+        # Calculate current streak. Today gets a grace period: not having
+        # focused *yet* today shouldn't zero a streak that's still alive.
         current_streak = 0
         check_date = datetime.now().date()
+        if check_date not in session_dates:
+            check_date -= timedelta(days=1)
 
         while check_date in session_dates:
             current_streak += 1
@@ -338,16 +280,7 @@ class StatsTracker:
         if not current:
             return {}
 
-        # Get all sessions before this one
-        all_sessions = self.db_manager.get_all_sessions(limit=1000)
-
-        # Find previous session
-        previous = None
-        for session in all_sessions:
-            if session['id'] < session_id:
-                previous = session
-                break
-
+        previous = self.db_manager.get_session_before(session_id)
         if not previous:
             return {'has_previous': False}
 

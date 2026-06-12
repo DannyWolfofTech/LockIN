@@ -44,8 +44,4 @@ CREATE INDEX IF NOT EXISTS idx_blocked_apps_session_id ON blocked_apps(session_i
 CREATE INDEX IF NOT EXISTS idx_blocked_apps_name ON blocked_apps(app_name);
 
 -- Insert default settings
-INSERT OR IGNORE INTO settings (key, value) VALUES ('theme', 'dark');
-INSERT OR IGNORE INTO settings (key, value) VALUES ('emergency_password_enabled', 'false');
-INSERT OR IGNORE INTO settings (key, value) VALUES ('emergency_password_hash', '');
-INSERT OR IGNORE INTO settings (key, value) VALUES ('fullscreen_mode', 'false');
-INSERT OR IGNORE INTO settings (key, value) VALUES ('show_motivational_quotes', 'true');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('theme', 'light');

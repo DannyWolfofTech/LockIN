@@ -94,13 +94,17 @@ class DatabaseManager:
             Session ID
         """
         try:
+            # created_at is set explicitly in local time; the schema's
+            # CURRENT_TIMESTAMP default is UTC, which would shift the
+            # heatmap/streak day grouping by the timezone offset.
+            now = datetime.now()
             cursor = self.connection.cursor()
             cursor.execute("""
                 INSERT INTO sessions (name, description, duration_seconds,
-                                    apps_whitelisted, started_at)
-                VALUES (?, ?, ?, ?, ?)
+                                    apps_whitelisted, started_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (name, description, duration_seconds,
-                  json.dumps(apps_whitelisted), datetime.now()))
+                  json.dumps(apps_whitelisted), now, now))
 
             self.connection.commit()
             return cursor.lastrowid
@@ -108,6 +112,13 @@ class DatabaseManager:
         except sqlite3.Error as e:
             print(f"Error creating session: {e}")
             raise
+
+    # Columns update_session may touch; anything else is a programming error.
+    _UPDATABLE_SESSION_FIELDS = {
+        'name', 'description', 'notes', 'duration_seconds',
+        'time_locked_in_seconds', 'apps_blocked_count',
+        'emergency_exit_used', 'ended_at', 'status',
+    }
 
     def update_session(self, session_id: int, **kwargs) -> None:
         """
@@ -120,6 +131,10 @@ class DatabaseManager:
         try:
             if not kwargs:
                 return
+
+            unknown = set(kwargs) - self._UPDATABLE_SESSION_FIELDS
+            if unknown:
+                raise ValueError(f"Unknown session fields: {unknown}")
 
             # Build UPDATE query dynamically
             fields = ', '.join([f"{key} = ?" for key in kwargs.keys()])
@@ -260,13 +275,8 @@ class DatabaseManager:
                     VALUES (?, ?, ?)
                 """, (session_id, app_name, app_path))
 
-            # Update session's blocked count
-            cursor.execute("""
-                UPDATE sessions
-                SET apps_blocked_count = apps_blocked_count + 1
-                WHERE id = ?
-            """, (session_id,))
-
+            # sessions.apps_blocked_count is written once at session end
+            # (SessionManager keeps the live counter) - no per-event UPDATE.
             self.connection.commit()
 
         except sqlite3.Error as e:
@@ -297,6 +307,63 @@ class DatabaseManager:
             print(f"Error getting blocked apps: {e}")
             return []
 
+    def get_top_blocked_apps(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get the most blocked apps across all sessions in one query.
+
+        Args:
+            limit: Maximum number of apps to return
+
+        Returns:
+            List of dicts: app_name, total_blocks, sessions_blocked_in
+        """
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                SELECT app_name,
+                       SUM(blocked_count) AS total_blocks,
+                       COUNT(DISTINCT session_id) AS sessions_blocked_in
+                FROM blocked_apps
+                GROUP BY app_name
+                ORDER BY total_blocks DESC
+                LIMIT ?
+            """, (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+
+        except sqlite3.Error as e:
+            print(f"Error getting top blocked apps: {e}")
+            return []
+
+    def get_session_before(self, session_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get the most recent finished session that started before the given one.
+
+        Args:
+            session_id: Reference session ID
+
+        Returns:
+            Session dictionary or None
+        """
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                SELECT * FROM sessions
+                WHERE id < ? AND ended_at IS NOT NULL
+                ORDER BY id DESC
+                LIMIT 1
+            """, (session_id,))
+            row = cursor.fetchone()
+            if row:
+                session_dict = dict(row)
+                session_dict['apps_whitelisted'] = json.loads(
+                    session_dict['apps_whitelisted'])
+                return session_dict
+            return None
+
+        except sqlite3.Error as e:
+            print(f"Error getting previous session: {e}")
+            return None
+
     # ==================== STATISTICS ====================
 
     def get_total_stats(self) -> Dict[str, Any]:
@@ -321,23 +388,7 @@ class DatabaseManager:
                 WHERE status IN ('completed', 'emergency_exit')
             """)
 
-            stats = dict(cursor.fetchone())
-
-            # Most common whitelisted apps
-            cursor.execute("""
-                SELECT apps_whitelisted FROM sessions
-            """)
-
-            all_apps = []
-            for row in cursor.fetchall():
-                apps = json.loads(row['apps_whitelisted'])
-                all_apps.extend(apps)
-
-            from collections import Counter
-            app_counts = Counter(all_apps)
-            stats['most_common_whitelisted'] = app_counts.most_common(10)
-
-            return stats
+            return dict(cursor.fetchone())
 
         except sqlite3.Error as e:
             print(f"Error getting total stats: {e}")
