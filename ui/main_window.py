@@ -141,16 +141,12 @@ class FocusSetupScreen(QWidget):
     # ---- app list
 
     def refresh_apps(self):
+        # Single scan: installed apps already carry the 'running' flag.
         blocker = self.session_manager.app_blocker
-        installed = blocker.get_all_installed_apps()
-        running = {a["display_name"] for a in blocker.get_running_apps()}
         self.all_apps = sorted(
-            installed,
-            key=lambda a: (a["display_name"] not in running,
-                           a["display_name"].lower()),
+            blocker.get_all_installed_apps(),
+            key=lambda a: (not a.get("running"), a["display_name"].lower()),
         )
-        for app in self.all_apps:
-            app["running"] = app["display_name"] in running
         self._filter(self.search.text())
 
     def _filter(self, text: str):
@@ -160,11 +156,12 @@ class FocusSetupScreen(QWidget):
             name = app["display_name"]
             if text and text not in name.lower():
                 continue
-            item = QListWidgetItem(("●  " if app["running"] else "") + name)
+            running = bool(app.get("running"))
+            item = QListWidgetItem(("●  " if running else "") + name)
             item.setData(Qt.ItemDataRole.UserRole, name)
             if app.get("icon"):
                 item.setIcon(app["icon"])
-            if app["running"]:
+            if running:
                 item.setForeground(QColor(palette()["accent"]))
             self.available.addItem(item)
 

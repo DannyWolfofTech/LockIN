@@ -8,7 +8,7 @@ import sys
 import os
 from typing import List, Set, Optional, Dict
 from pathlib import Path
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal, QFileInfo
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QFileIconProvider
 
@@ -57,6 +57,16 @@ class AppBlocker(QObject):
         # Cache of known processes to avoid repeated blocking attempts
         self.known_processes: Dict[int, str] = {}
 
+        # PIDs that were sent terminate() and get force-killed on the
+        # next tick if still alive - never block the event loop waiting.
+        self._pending_kill: Set[int] = set()
+        self.blocked_count = 0
+
+        # Icon lookups are expensive on large scans - share one provider
+        # and cache per executable path.
+        self._icon_provider: Optional[QFileIconProvider] = None
+        self._icon_cache: Dict[str, Optional[QIcon]] = {}
+
     def set_whitelisted_apps(self, apps: List[str]) -> None:
         """
         Set the list of whitelisted applications
@@ -85,6 +95,8 @@ class AppBlocker(QObject):
 
         self.is_monitoring = True
         self.known_processes.clear()
+        self._pending_kill.clear()
+        self.blocked_count = 0
 
         # Scan current processes and mark whitelisted ones
         self._scan_initial_processes()
@@ -97,20 +109,24 @@ class AppBlocker(QObject):
         self.is_monitoring = False
         self.monitor_timer.stop()
         self.known_processes.clear()
+        self._pending_kill.clear()
 
     def _scan_initial_processes(self) -> None:
-        """Scan and whitelist all currently running processes"""
+        """Record currently running whitelisted processes.
+
+        Non-whitelisted processes are deliberately NOT marked known:
+        anything that survived the initial close sweep (slow shutdown,
+        ignored terminate) gets picked up and blocked by the first
+        monitoring tick instead of being grandfathered in.
+        """
         try:
             for proc in psutil.process_iter(['pid', 'name', 'exe']):
                 try:
                     pid = proc.info['pid']
                     name = proc.info['name'] or ''
 
-                    # Add to known processes
-                    self.known_processes[pid] = name
-
-                    # If it's whitelisted, mark it
                     if self._is_whitelisted(name, proc.info.get('exe', '')):
+                        self.known_processes[pid] = name
                         self.whitelisted_processes.add(pid)
 
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -125,9 +141,17 @@ class AppBlocker(QObject):
             return
 
         try:
+            # Force-kill anything that ignored terminate() last tick
+            for pid in list(self._pending_kill):
+                self._pending_kill.discard(pid)
+                try:
+                    psutil.Process(pid).kill()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+
             current_pids = set()
 
-            for proc in psutil.process_iter(['pid', 'name', 'exe', 'create_time']):
+            for proc in psutil.process_iter(['pid', 'name', 'exe']):
                 try:
                     pid = proc.info['pid']
                     current_pids.add(pid)
@@ -212,18 +236,15 @@ class AppBlocker(QObject):
             if self._is_whitelisted(name, exe_path):
                 return
 
-            # Try to terminate gracefully first
+            # Terminate without waiting - blocking the event loop here
+            # froze the UI for up to a second per process. If it's still
+            # alive next tick, _check_processes force-kills it.
             proc.terminate()
-
-            # Wait briefly for termination
-            try:
-                proc.wait(timeout=1)
-            except psutil.TimeoutExpired:
-                # Force kill if needed
-                proc.kill()
+            self._pending_kill.add(pid)
 
             # Mark as known (blocked)
             self.known_processes[pid] = name
+            self.blocked_count += 1
 
             # Emit signal
             self.app_blocked.emit(name, exe_path)
@@ -246,6 +267,7 @@ class AppBlocker(QObject):
         for pid in dead_pids:
             self.known_processes.pop(pid, None)
             self.whitelisted_processes.discard(pid)
+            self._pending_kill.discard(pid)
 
     def _get_app_icon(self, exe_path: str) -> Optional[QIcon]:
         """
@@ -257,26 +279,24 @@ class AppBlocker(QObject):
         Returns:
             QIcon if found, None otherwise
         """
-        if not exe_path or not os.path.exists(exe_path):
+        if not exe_path:
             return None
+        if exe_path in self._icon_cache:
+            return self._icon_cache[exe_path]
 
+        icon = None
         try:
-            # Use Qt's file icon provider (works cross-platform)
-            icon_provider = QFileIconProvider()
-            icon = icon_provider.icon(QFileIconProvider.IconType.File)
-
-            # Try to get specific file icon
-            from PyQt6.QtCore import QFileInfo
-            file_info = QFileInfo(exe_path)
-            file_icon = icon_provider.icon(file_info)
-
-            if not file_icon.isNull():
-                return file_icon
-
-            return icon if not icon.isNull() else None
-
+            if os.path.exists(exe_path):
+                if self._icon_provider is None:
+                    self._icon_provider = QFileIconProvider()
+                file_icon = self._icon_provider.icon(QFileInfo(exe_path))
+                if not file_icon.isNull():
+                    icon = file_icon
         except Exception:
-            return None
+            icon = None
+
+        self._icon_cache[exe_path] = icon
+        return icon
 
     def get_running_apps(self) -> List[Dict[str, str]]:
         """
@@ -332,13 +352,16 @@ class AppBlocker(QObject):
         Get ALL installed applications on the system (running + installed)
 
         Returns:
-            List of dicts with 'name', 'display_name', 'path', and 'icon' keys
+            List of dicts with 'name', 'display_name', 'path', 'icon',
+            and 'running' keys. Callers should use the 'running' flag
+            instead of doing a second process scan.
         """
         apps = {}  # Use dict to avoid duplicates, keyed by display_name
 
         # First, get all running apps
         running_apps = self.get_running_apps()
         for app in running_apps:
+            app['running'] = True
             apps[app['display_name']] = app
 
         # Then scan common installation directories
@@ -405,7 +428,8 @@ class AppBlocker(QObject):
                                     'name': file,
                                     'display_name': display_name,
                                     'path': exe_path,
-                                    'icon': icon
+                                    'icon': icon,
+                                    'running': False
                                 }
 
                 # For Linux, look for .desktop files
@@ -431,7 +455,8 @@ class AppBlocker(QObject):
                                             'name': app_name,
                                             'display_name': app_name,
                                             'path': exec_path or '',
-                                            'icon': icon
+                                            'icon': icon,
+                                            'running': False
                                         }
                             except:
                                 continue
@@ -449,7 +474,8 @@ class AppBlocker(QObject):
                                     'name': item,
                                     'display_name': app_name,
                                     'path': app_path,
-                                    'icon': icon
+                                    'icon': icon,
+                                    'running': False
                                 }
 
             except Exception as e:
@@ -496,5 +522,5 @@ class AppBlocker(QObject):
         return closed_count
 
     def get_blocked_count(self) -> int:
-        """Get the number of processes that have been blocked"""
-        return len([p for p in self.known_processes.values() if p])
+        """Get the number of processes blocked since monitoring started"""
+        return self.blocked_count
