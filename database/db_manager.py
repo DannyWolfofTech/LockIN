@@ -5,10 +5,19 @@ Handles all SQLite database operations
 
 import sqlite3
 import json
-import os
 from datetime import datetime
-from typing import List, Dict, Optional, Any, Tuple
+from typing import List, Dict, Optional, Any
 from pathlib import Path
+
+
+def _now() -> str:
+    """Local-time timestamp string.
+
+    Stored as text on purpose: sqlite3's implicit datetime adapters are
+    deprecated since Python 3.12, and ISO strings parse cleanly with
+    datetime.fromisoformat() everywhere we read them back.
+    """
+    return datetime.now().isoformat(sep=' ', timespec='seconds')
 
 
 class DatabaseManager:
@@ -97,7 +106,7 @@ class DatabaseManager:
             # created_at is set explicitly in local time; the schema's
             # CURRENT_TIMESTAMP default is UTC, which would shift the
             # heatmap/streak day grouping by the timezone offset.
-            now = datetime.now()
+            now = _now()
             cursor = self.connection.cursor()
             cursor.execute("""
                 INSERT INTO sessions (name, description, duration_seconds,
@@ -173,7 +182,7 @@ class DatabaseManager:
                     ended_at = ?,
                     status = ?
                 WHERE id = ?
-            """, (time_locked_in, emergency_exit, datetime.now(), status, session_id))
+            """, (time_locked_in, emergency_exit, _now(), status, session_id))
 
             self.connection.commit()
 
@@ -267,7 +276,7 @@ class DatabaseManager:
                     SET blocked_count = blocked_count + 1,
                         last_blocked_at = ?
                     WHERE id = ?
-                """, (datetime.now(), existing['id']))
+                """, (_now(), existing['id']))
             else:
                 # Create new record
                 cursor.execute("""
@@ -457,7 +466,7 @@ class DatabaseManager:
             cursor.execute("""
                 INSERT OR REPLACE INTO settings (key, value, updated_at)
                 VALUES (?, ?, ?)
-            """, (key, value, datetime.now()))
+            """, (key, value, _now()))
 
             self.connection.commit()
 

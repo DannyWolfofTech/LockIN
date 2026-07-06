@@ -4,7 +4,6 @@ Coordinates timing, app blocking, and session state
 """
 
 import time
-from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
@@ -64,6 +63,10 @@ class SessionManager(QObject):
         self.apps_blocked_count: int = 0
         self.session_notes: str = ""  # cached; mirrored to DB on save
 
+        # Pause bookkeeping - elapsed time must stop while paused
+        self.paused_at: Optional[float] = None
+        self.total_paused: float = 0.0
+
         # Timer for session updates
         self.session_timer = QTimer(self)
         self.session_timer.timeout.connect(self._update_session)
@@ -97,6 +100,8 @@ class SessionManager(QObject):
             self.whitelisted_apps = list(whitelisted_apps)
             self.apps_blocked_count = 0
             self.session_notes = ""
+            self.paused_at = None
+            self.total_paused = 0.0
 
             # Create session in database
             self.session_id = self.db_manager.create_session(
@@ -157,49 +162,44 @@ class SessionManager(QObject):
         Returns:
             True if ended successfully
         """
+        if self.current_state not in [SessionState.ACTIVE, SessionState.PAUSED]:
+            return False
+
+        self._change_state(SessionState.ENDING)
+
+        # Stop monitoring and timer
+        self.app_blocker.stop_monitoring()
+        self.session_timer.stop()
+
+        # Actual focus time (excludes any paused stretches)
+        time_spent = self.get_elapsed_time()
+
+        # A failed database write must not leave the app stuck in
+        # ENDING with the window minimized - always finish and emit.
         try:
-            if self.current_state not in [SessionState.ACTIVE, SessionState.PAUSED]:
-                return False
-
-            self._change_state(SessionState.ENDING)
-
-            # Stop monitoring and timer
-            self.app_blocker.stop_monitoring()
-            self.session_timer.stop()
-
-            # Calculate actual time spent
-            if self.session_start_time:
-                time_spent = int(time.time() - self.session_start_time)
-            else:
-                time_spent = 0
-
-            # Update database
             self.db_manager.end_session(
                 session_id=self.session_id,
                 time_locked_in=time_spent,
                 emergency_exit=emergency_exit
             )
-
-            # Update apps blocked count
             self.db_manager.update_session(
                 session_id=self.session_id,
                 apps_blocked_count=self.apps_blocked_count
             )
-
-            self._change_state(SessionState.COMPLETED)
-            self.session_ended.emit(self.session_id, emergency_exit)
-
-            return True
-
         except Exception as e:
-            print(f"Error ending session: {e}")
-            return False
+            print(f"Error saving session results: {e}")
+
+        self._change_state(SessionState.COMPLETED)
+        self.session_ended.emit(self.session_id, emergency_exit)
+
+        return True
 
     def pause_session(self) -> bool:
-        """Pause the current session (if needed)"""
+        """Pause the current session: blocking stops AND the clock stops."""
         if self.current_state != SessionState.ACTIVE:
             return False
 
+        self.paused_at = time.time()
         self.session_timer.stop()
         self.app_blocker.stop_monitoring()
         self._change_state(SessionState.PAUSED)
@@ -210,6 +210,9 @@ class SessionManager(QObject):
         if self.current_state != SessionState.PAUSED:
             return False
 
+        if self.paused_at is not None:
+            self.total_paused += time.time() - self.paused_at
+            self.paused_at = None
         self.session_timer.start()
         self.app_blocker.start_monitoring()
         self._change_state(SessionState.ACTIVE)
@@ -217,14 +220,15 @@ class SessionManager(QObject):
 
     def get_elapsed_time(self) -> int:
         """
-        Get elapsed time in seconds
+        Get elapsed focus time in seconds (time spent paused excluded)
 
         Returns:
             Elapsed seconds
         """
         if self.session_start_time is None:
             return 0
-        return int(time.time() - self.session_start_time)
+        end = self.paused_at if self.paused_at is not None else time.time()
+        return int(end - self.session_start_time - self.total_paused)
 
     def get_remaining_time(self) -> int:
         """
@@ -312,6 +316,8 @@ class SessionManager(QObject):
         self.whitelisted_apps.clear()
         self.apps_blocked_count = 0
         self.session_notes = ""
+        self.paused_at = None
+        self.total_paused = 0.0
 
         self._change_state(SessionState.IDLE)
 

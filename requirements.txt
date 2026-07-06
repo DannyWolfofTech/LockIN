@@ -1,12 +1,9 @@
 # Lock In - Focus/Productivity Desktop Application
 # Python 3.11+ required
 
-# GUI
+# GUI (icons come from Qt's QFileIconProvider - no pywin32 needed)
 PyQt6>=6.6.0
 PyQt6-Qt6>=6.6.0
 
 # Process management
 psutil>=5.9.0
-
-# Windows-specific (optional, for app icon extraction)
-pywin32>=306; platform_system == "Windows"

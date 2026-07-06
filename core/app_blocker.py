@@ -16,15 +16,6 @@ from core.app_filter import (
     is_displayable, is_protected, is_garbage_name, friendly_name,
 )
 
-# Optional imports for Windows icon extraction
-try:
-    import win32api
-    import win32con
-    import win32gui
-    WINDOWS_ICONS_AVAILABLE = True
-except ImportError:
-    WINDOWS_ICONS_AVAILABLE = False
-
 
 class AppBlocker(QObject):
     """
@@ -49,6 +40,10 @@ class AppBlocker(QObject):
         self.whitelisted_processes: Set[int] = set()  # PIDs of whitelisted apps
         self.is_monitoring = False
         self.monitor_interval = 1000  # Check every 1 second
+
+        # Never touch our own process. Name-based protection covers
+        # 'python', but a packaged LockIn.exe would otherwise kill itself.
+        self._own_pid = os.getpid()
 
         # Timer for monitoring
         self.monitor_timer = QTimer(self)
@@ -155,6 +150,10 @@ class AppBlocker(QObject):
                 try:
                     pid = proc.info['pid']
                     current_pids.add(pid)
+
+                    # Never block ourselves
+                    if pid == self._own_pid:
+                        continue
 
                     # Skip if already known and whitelisted
                     if pid in self.whitelisted_processes:
@@ -298,9 +297,18 @@ class AppBlocker(QObject):
         self._icon_cache[exe_path] = icon
         return icon
 
-    def get_running_apps(self) -> List[Dict[str, str]]:
+    def get_icon(self, exe_path: str) -> Optional[QIcon]:
+        """Cached icon lookup. GUI thread only (creates QIcons)."""
+        return self._get_app_icon(exe_path)
+
+    def get_running_apps(self, fetch_icons: bool = True) -> List[Dict[str, str]]:
         """
         Get list of all currently running USER applications (filters out system processes)
+
+        Args:
+            fetch_icons: Set False when calling off the GUI thread -
+                         icon creation is not thread-safe. Callers can
+                         resolve icons later via get_icon().
 
         Returns:
             List of dicts with 'name', 'display_name', 'path', and 'icon' keys
@@ -309,8 +317,11 @@ class AppBlocker(QObject):
         seen = set()
 
         try:
-            for proc in psutil.process_iter(['name', 'exe']):
+            for proc in psutil.process_iter(['pid', 'name', 'exe']):
                 try:
+                    if proc.info['pid'] == self._own_pid:
+                        continue
+
                     name = proc.info['name']
                     exe_path = proc.info.get('exe', '') or ''
 
@@ -329,8 +340,7 @@ class AppBlocker(QObject):
 
                     seen.add(name.lower())
 
-                    # Try to get icon
-                    icon = self._get_app_icon(exe_path)
+                    icon = self._get_app_icon(exe_path) if fetch_icons else None
 
                     apps.append({
                         'name': name,  # Original process name
@@ -347,9 +357,14 @@ class AppBlocker(QObject):
 
         return sorted(apps, key=lambda x: x['display_name'].lower())
 
-    def get_all_installed_apps(self) -> List[Dict[str, str]]:
+    def get_all_installed_apps(self, fetch_icons: bool = True) -> List[Dict[str, str]]:
         """
         Get ALL installed applications on the system (running + installed)
+
+        Args:
+            fetch_icons: Set False when calling off the GUI thread -
+                         icon creation is not thread-safe. Callers can
+                         resolve icons later via get_icon().
 
         Returns:
             List of dicts with 'name', 'display_name', 'path', 'icon',
@@ -359,7 +374,7 @@ class AppBlocker(QObject):
         apps = {}  # Use dict to avoid duplicates, keyed by display_name
 
         # First, get all running apps
-        running_apps = self.get_running_apps()
+        running_apps = self.get_running_apps(fetch_icons=fetch_icons)
         for app in running_apps:
             app['running'] = True
             apps[app['display_name']] = app
@@ -421,8 +436,8 @@ class AppBlocker(QObject):
                                 if display_name in apps:
                                     continue
 
-                                # Try to get icon
-                                icon = self._get_app_icon(exe_path)
+                                icon = (self._get_app_icon(exe_path)
+                                        if fetch_icons else None)
 
                                 apps[display_name] = {
                                     'name': file,
@@ -450,7 +465,8 @@ class AppBlocker(QObject):
                                             exec_path = line.split('=', 1)[1].strip()
 
                                     if app_name and app_name not in apps:
-                                        icon = self._get_app_icon(exec_path if exec_path else '')
+                                        icon = (self._get_app_icon(exec_path or '')
+                                                if fetch_icons else None)
                                         apps[app_name] = {
                                             'name': app_name,
                                             'display_name': app_name,
@@ -469,7 +485,8 @@ class AppBlocker(QObject):
                             app_name = item[:-4]  # Remove .app extension
 
                             if app_name not in apps:
-                                icon = self._get_app_icon(app_path)
+                                icon = (self._get_app_icon(app_path)
+                                        if fetch_icons else None)
                                 apps[app_name] = {
                                     'name': item,
                                     'display_name': app_name,
@@ -500,6 +517,10 @@ class AppBlocker(QObject):
                     pid = proc.info['pid']
                     name = proc.info['name'] or ''
                     exe_path = proc.info.get('exe', '') or ''
+
+                    # Never close ourselves
+                    if pid == self._own_pid:
+                        continue
 
                     # Skip whitelisted
                     if self._is_whitelisted(name, exe_path):

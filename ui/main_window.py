@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QStackedWidget, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QScrollArea, QMessageBox, QApplication, QButtonGroup, QCheckBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from PyQt6.QtGui import QCloseEvent, QColor
 
 from ui.theme import apply_theme, palette, mode
@@ -35,6 +35,24 @@ from database.db_manager import DatabaseManager
 
 # ================================================================ screens
 
+class _AppScanThread(QThread):
+    """Scans installed apps off the GUI thread.
+
+    Icons are NOT fetched here (QIcon creation isn't thread-safe);
+    the list view resolves them lazily via AppBlocker.get_icon().
+    """
+
+    apps_ready = pyqtSignal(list)
+
+    def __init__(self, blocker, parent=None):
+        super().__init__(parent)
+        self._blocker = blocker
+
+    def run(self):
+        self.apps_ready.emit(
+            self._blocker.get_all_installed_apps(fetch_icons=False))
+
+
 class FocusSetupScreen(QWidget):
     """Name it, time it, pick what's allowed, lock in."""
 
@@ -45,6 +63,7 @@ class FocusSetupScreen(QWidget):
         self.setObjectName("Screen")
         self.session_manager = session_manager
         self.all_apps = []
+        self._scan_thread = None
         self._build_ui()
         self.refresh_apps()
 
@@ -123,9 +142,9 @@ class FocusSetupScreen(QWidget):
 
         # --- actions
         actions = QHBoxLayout()
-        refresh = button("Refresh apps", "ghost")
-        refresh.clicked.connect(self.refresh_apps)
-        actions.addWidget(refresh)
+        self.refresh_btn = button("Refresh apps", "ghost")
+        self.refresh_btn.clicked.connect(self.refresh_apps)
+        actions.addWidget(self.refresh_btn)
         save_tpl = button("Save as template", "ghost",
                           "Save this name + duration + app list for one-click reuse")
         save_tpl.clicked.connect(self._save_template)
@@ -141,16 +160,37 @@ class FocusSetupScreen(QWidget):
     # ---- app list
 
     def refresh_apps(self):
-        # Single scan: installed apps already carry the 'running' flag.
-        blocker = self.session_manager.app_blocker
+        """Kick off a background scan; the UI stays responsive."""
+        if self._scan_thread is not None and self._scan_thread.isRunning():
+            return
+        self.refresh_btn.setEnabled(False)
+        self.refresh_btn.setText("Scanning…")
+        self._scan_thread = _AppScanThread(
+            self.session_manager.app_blocker, self)
+        self._scan_thread.apps_ready.connect(self._on_apps_scanned)
+        self._scan_thread.start()
+
+    def _on_apps_scanned(self, apps: list):
         self.all_apps = sorted(
-            blocker.get_all_installed_apps(),
+            apps,
             key=lambda a: (not a.get("running"), a["display_name"].lower()),
         )
+        self._filter(self.search.text())
+        self.refresh_btn.setText("Refresh apps")
+        self.refresh_btn.setEnabled(True)
+
+    def shutdown_scan(self):
+        """Block until any in-flight scan finishes (called on app close)."""
+        if self._scan_thread is not None and self._scan_thread.isRunning():
+            self._scan_thread.wait(5000)
+
+    def retint(self):
+        """Re-apply palette-dependent colors without rescanning disk."""
         self._filter(self.search.text())
 
     def _filter(self, text: str):
         text = text.lower()
+        blocker = self.session_manager.app_blocker
         self.available.clear()
         for app in self.all_apps:
             name = app["display_name"]
@@ -159,6 +199,9 @@ class FocusSetupScreen(QWidget):
             running = bool(app.get("running"))
             item = QListWidgetItem(("●  " if running else "") + name)
             item.setData(Qt.ItemDataRole.UserRole, name)
+            if app.get("icon") is None:
+                # Lazy icon lookup on the GUI thread (cached in blocker)
+                app["icon"] = blocker.get_icon(app.get("path", ""))
             if app.get("icon"):
                 item.setIcon(app["icon"])
             if running:
@@ -429,26 +472,24 @@ class StatsScreen(QWidget):
             f"{week['total_apps_blocked']} apps blocked"
         )
 
+        # Rows are widgets (not bare layouts) so deleteLater reclaims them
         while self.blocked_rows.count():
             item = self.blocked_rows.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-            elif item.layout():
-                while item.layout().count():
-                    sub = item.layout().takeAt(0)
-                    if sub.widget():
-                        sub.widget().deleteLater()
         top = self.stats_tracker.get_top_blocked_apps(limit=5)
         if not top:
             self.blocked_rows.addWidget(
                 label("Nothing blocked yet - clean hands.", "sub")
             )
         for app in top:
-            row = QHBoxLayout()
+            row_widget = QWidget()
+            row = QHBoxLayout(row_widget)
+            row.setContentsMargins(0, 0, 0, 0)
             row.addWidget(label(app["app_name"], "sub"))
             row.addStretch()
             row.addWidget(label(f"{app['total_blocks']}×", "accent"))
-            self.blocked_rows.addLayout(row)
+            self.blocked_rows.addWidget(row_widget)
 
 
 class SessionEndScreen(QWidget):
@@ -668,7 +709,7 @@ class MainWindow(QMainWindow):
         apply_theme(QApplication.instance(), new_mode)
         self.db_manager.set_setting("theme", new_mode)
         self.theme_btn.setText("Dark" if new_mode == "light" else "Light")
-        self.setup_screen.refresh_apps()  # re-tint running indicators
+        self.setup_screen.retint()  # re-tint running indicators, no rescan
 
     # ---- session lifecycle
 
@@ -718,6 +759,7 @@ class MainWindow(QMainWindow):
             )
             event.ignore()
             return
+        self.setup_screen.shutdown_scan()
         self.session_manager.reset()
         self.db_manager.close()
         event.accept()

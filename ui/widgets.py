@@ -132,6 +132,8 @@ class DurationPicker(QWidget):
             spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
             spin.setMinimumWidth(130)
             spin.setMinimumHeight(46)
+            # Remember custom values so toggling chips doesn't lose them
+            spin.valueChanged.connect(self._custom_changed)
         row.addWidget(self.hours)
         row.addWidget(self.minutes)
         row.addStretch()
@@ -155,6 +157,10 @@ class DurationPicker(QWidget):
         self.hours.setValue(self._minutes // 60)
         self.minutes.setValue(self._minutes % 60)
         self.custom_row.setVisible(True)
+
+    def _custom_changed(self, _value):
+        if self.custom_chip.isChecked():
+            self._minutes = self.hours.value() * 60 + self.minutes.value()
 
     def get_total_minutes(self) -> int:
         if self.custom_chip.isChecked():
@@ -282,6 +288,7 @@ class FocusPill(QWidget):
         self.elapsed = 0
         self.remaining = 0
         self.duration_secs = 0
+        self.blocked_total = 0
         self._drag_offset = None
 
         self.setWindowFlags(
@@ -292,6 +299,7 @@ class FocusPill(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self._build_ui()
         self.session_manager.session_updated.connect(self._on_tick)
+        self.session_manager.app_blocked.connect(self._on_blocked)
 
     def _build_ui(self):
         outer = QVBoxLayout(self)
@@ -345,6 +353,7 @@ class FocusPill(QWidget):
         self.elapsed = 0
         self.duration_secs = info["duration"] if info else 0
         self.remaining = self.duration_secs
+        self.blocked_total = 0
         self.countdown = True
         self.collapsed = False
         self._apply_collapse()
@@ -370,7 +379,14 @@ class FocusPill(QWidget):
         self.timer_label.setText(
             f"{secs // 3600:02d}:{secs % 3600 // 60:02d}:{secs % 60:02d}"
         )
-        self.mode_caption.setText("TIME LEFT" if self.countdown else "ELAPSED")
+        caption = "TIME LEFT" if self.countdown else "ELAPSED"
+        if self.blocked_total:
+            caption += f"  ·  {self.blocked_total} BLOCKED"
+        self.mode_caption.setText(caption)
+
+    def _on_blocked(self, _app_name: str, total: int):
+        self.blocked_total = total
+        self._refresh()
 
     def _toggle_mode(self):
         self.countdown = not self.countdown
@@ -460,14 +476,16 @@ class _Popover(QWidget):
 
     def open_near(self, anchor: QWidget):
         """Show below the anchor, right-aligned, clamped to screen."""
+        self.adjustSize()
+        height = self.sizeHint().height()
         x = anchor.x() + anchor.width() - self.width()
         y = anchor.y() + anchor.height() + 4
         screen = QApplication.primaryScreen()
         if screen:
             geo = screen.availableGeometry()
             x = max(geo.left() + 8, min(x, geo.right() - self.width() - 8))
-            if y + 300 > geo.bottom():
-                y = anchor.y() - 300
+            if y + height > geo.bottom():
+                y = max(geo.top() + 8, anchor.y() - height - 4)
         self.move(x, y)
         self.show()
         self.raise_()

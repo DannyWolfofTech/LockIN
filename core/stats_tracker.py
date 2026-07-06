@@ -2,7 +2,7 @@
 Stats Tracker - Analytics and statistics for focus sessions
 """
 
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any
 from datetime import datetime, timedelta
 from database.db_manager import DatabaseManager
 

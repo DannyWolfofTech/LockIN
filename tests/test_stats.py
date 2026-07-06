@@ -15,6 +15,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database.db_manager import DatabaseManager
 from core.stats_tracker import StatsTracker
 
+try:
+    # Needs PyQt6 + psutil; skipped in environments without them.
+    from core.session_manager import SessionManager
+    HAS_QT = True
+except ImportError:
+    HAS_QT = False
+
 
 class StatsTestCase(unittest.TestCase):
 
@@ -123,6 +130,27 @@ class StatsTestCase(unittest.TestCase):
         self.assertEqual(info['current_streak'], 1)
         self.assertEqual(info['longest_streak'], 2)
 
+    # ---- timestamps stored as plain strings (no deprecated adapters)
+
+    def test_timestamps_are_strings(self):
+        sid = self._finished_session()
+        session = self.db.get_session(sid)
+        for field in ('created_at', 'started_at', 'ended_at'):
+            self.assertIsInstance(session[field], str)
+            datetime.fromisoformat(session[field])  # must parse
+
+    # ---- settings roundtrip
+
+    def test_settings_roundtrip(self):
+        self.assertEqual(self.db.get_setting('missing', 'fallback'), 'fallback')
+        self.db.set_setting('theme', 'dark')
+        self.assertEqual(self.db.get_setting('theme'), 'dark')
+        self.db.set_setting('theme', 'light')
+        self.assertEqual(self.db.get_setting('theme'), 'light')
+
+    def test_fresh_database_defaults_to_light_theme(self):
+        self.assertEqual(self.db.get_setting('theme'), 'light')
+
     # ---- update_session guard
 
     def test_update_session_rejects_unknown_field(self):
@@ -141,6 +169,35 @@ class StatsTestCase(unittest.TestCase):
         # ... that is written once, at session end.
         self.db.update_session(sid, apps_blocked_count=4)
         self.assertEqual(self.db.get_session(sid)['apps_blocked_count'], 4)
+
+
+@unittest.skipUnless(HAS_QT, "PyQt6/psutil not installed")
+class PauseClockTestCase(unittest.TestCase):
+    """The session clock must freeze while paused."""
+
+    def setUp(self):
+        import time as _time
+        self._time = _time
+        fd, self.db_path = tempfile.mkstemp(suffix='.db')
+        os.close(fd)
+        self.db = DatabaseManager(db_path=self.db_path)
+        self.sm = SessionManager(self.db)
+
+    def tearDown(self):
+        self.db.close()
+        os.unlink(self.db_path)
+
+    def test_elapsed_excludes_paused_time(self):
+        now = self._time.time()
+        self.sm.session_start_time = now - 100
+        self.sm.total_paused = 40.0
+        self.assertAlmostEqual(self.sm.get_elapsed_time(), 60, delta=2)
+
+    def test_elapsed_frozen_while_paused(self):
+        now = self._time.time()
+        self.sm.session_start_time = now - 100
+        self.sm.paused_at = now - 10  # clock stopped 10s ago
+        self.assertAlmostEqual(self.sm.get_elapsed_time(), 90, delta=2)
 
 
 if __name__ == '__main__':
